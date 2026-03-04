@@ -1,0 +1,31 @@
+[package]
+name = "llama_rs"
+version = "0.1.0"
+edition = "2021"
+description = "Ultra-fast and safe Rust wrapper around llama.cpp"
+license = "MIT"
+readme = "README.md"
+repository = ""
+
+[lib]
+name = "llama_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "llama_rs"
+path = "src/main.rs"
+
+[dependencies]
+
+[dev-dependencies]
+criterion = "0.5"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
+
+[[bench]]
+name = "speed"
+harness = false

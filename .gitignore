@@ -1,0 +1,28 @@
+# Cargo
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build artifacts from llama.cpp (if built in-tree)
+/build/
+llama.cpp-master/build/
+*.dll
+*.lib
+*.a
+*.pdb
+
+# Env and secrets
+.env
+.env.local
+*.token
+
+# OS
+.DS_Store
+Thumbs.db
