@@ -1,26 +1,26 @@
-# Концепція Llama-RS
+# Llama-RS Concept
 
-## Ідея
+## Idea
 
-Максимум коду на **Rust** для швидкості та безпеки; мінімальний стабільний FFI до llama.cpp. Кінцевий продукт — один 64-бітний exe, зібраний cargo.
+Maximum code in **Rust** for speed and safety; minimal, stable FFI to llama.cpp. The final product is a single 64-bit exe built with cargo.
 
-## Принципи
+## Principles
 
-1. **Safe by default** — небезпечний код лише в ізольованому FFI-шарі; решта — safe Rust.
-2. **Zero-cost abstractions** — абстракції не додають накладних витрат у release.
-3. **Ultra-speed** — мінімум алокацій на шляху інференсу, батчінг, можливість zero-copy де це можливо.
-4. **Git-friendly** — чиста структура, submodule або зовнішній шлях до llama.cpp, без великих бінарників у репо.
-5. **MIT** — вільна ліцензія для використання та розповсюдження.
+1. **Safe by default** — Unsafe code only in an isolated FFI layer; everything else is safe Rust.
+2. **Zero-cost abstractions** — Abstractions add no overhead in release builds.
+3. **Ultra-speed** — Minimal allocations on the inference path, batching, zero-copy where possible.
+4. **Git-friendly** — Clean layout, submodule or external path to llama.cpp, no large binaries in the repo.
+5. **MIT** — Permissive license for use and distribution.
 
-## Джерело даних
+## Data source
 
-- Робоча версія **llama.cpp** береться з папки **master** (наприклад `S:\rust\llama-rs\llama.cpp-master` або вкладена `llama.cpp-master/llama.cpp-master`).
-- Збірка libllama виконується під час `cargo build` (build.rs) або вручну з подальнім посиланням.
+- The working **llama.cpp** version is taken from the **master** folder (e.g. `S:\rust\llama-rs\llama.cpp-master` or nested `llama.cpp-master/llama.cpp-master`).
+- Building libllama is done during `cargo build` (build.rs) or manually with subsequent linking.
 
-## Інструменти розробки
+## Development tools
 
-- **rustc** (через cargo) — компіляція.
+- **rustc** (via cargo) — compilation.
 - **cargo** — build, test, bench.
-- **git** — версіонування; при push — **gittoken** (token або credential helper).
+- **git** — version control; for push use **gittoken** (token or credential helper).
 
-Цей документ описує загальну концепцію; деталі реалізації — у [PLAN.md](PLAN.md) та [ARCHITECTURE.md](ARCHITECTURE.md).
+This document describes the overall concept; implementation details are in [PLAN.md](PLAN.md) and [ARCHITECTURE.md](ARCHITECTURE.md).

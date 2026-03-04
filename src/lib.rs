@@ -1,4 +1,4 @@
-//! Llama-RS — ultra-fast and safe Rust interface to llama.cpp.
+//! Llama-RS - ultra-fast and safe Rust interface to llama.cpp.
 //!
 //! This library provides a Rust-first API for loading and running
 //! GGUF models via the llama.cpp master build.

@@ -1,112 +1,112 @@
-# План проєкту Llama-RS
+# Llama-RS Project Plan
 
-## Мета
+## Goal
 
-Створити архітектуру Rust-проєкту для роботи з **llama.cpp** (master), з максимальною часткою коду на Rust для ультрашвидкої та безпечної роботи, збірка — 64-бітний `.exe`.
-
----
-
-## 1. Вимоги
-
-| Вимога | Рішення |
-|--------|---------|
-| Джерело llama | Папка `../llama.cpp-master` (або `llama.cpp-master/llama.cpp-master` при вкладеній структурі) |
-| Мова | Максимум Rust, мінімум FFI до C/C++ |
-| Безпека | Safe Rust API, небезпечний код лише в тонкому шарі біндингів |
-| Швидкість | Zero-copy де можливо, батчінг, мінімум алокацій на шляху інференсу |
-| Результат збірки | `target/release/llama_rs.exe` (x86_64-pc-windows-msvc) |
-| Ліцензія | MIT |
-| СКВ | Git-friendly структура, один репозиторій |
+Define the architecture of a Rust project that works with **llama.cpp** (master), with maximum Rust code for ultra-fast and safe operation, producing a 64-bit `.exe`.
 
 ---
 
-## 2. Структура проєкту (Git-friendly)
+## 1. Requirements
+
+| Requirement | Solution |
+|-------------|----------|
+| Llama source | Folder `../llama.cpp-master` (or `llama.cpp-master/llama.cpp-master` if nested) |
+| Language | Maximum Rust, minimum FFI to C/C++ |
+| Safety | Safe Rust API; unsafe code only in a thin bindings layer |
+| Speed | Zero-copy where possible, batching, minimal allocations on the inference path |
+| Build output | `target/release/llama_rs.exe` (x86_64-pc-windows-msvc) |
+| License | MIT |
+| VCS | Git-friendly layout, single repository |
+
+---
+
+## 2. Project Structure (Git-friendly)
 
 ```
 llama-rs-project/
 ├── .gitignore
-├── Cargo.toml              # workspace або пакет lib+bin
+├── Cargo.toml              # workspace or lib+bin package
 ├── LICENSE                  # MIT
 ├── README.md
-├── build.rs                 # збірка llama.cpp та/або біндингів
+├── build.rs                 # build llama.cpp and/or bindings
 ├── src/
-│   ├── lib.rs               # публічне API (safe Rust)
+│   ├── lib.rs               # public API (safe Rust)
 │   ├── main.rs              # CLI (exe)
-│   ├── ffi/                 # низькорівневі біндинги до llama.cpp (optional mod)
-│   └── safe/                # high-level safe обгортки (optional mod)
+│   ├── ffi/                 # low-level bindings to llama.cpp (optional mod)
+│   └── safe/                # high-level safe wrappers (optional mod)
 ├── docs/
-│   ├── PLAN.md              # цей план
-│   ├── ARCHITECTURE.md      # архітектура та діаграми
-│   ├── CONCEPT.md           # концепція та рішення
-│   └── DEVELOPMENT.md       # гайд для Rust-розробника
-├── tests/                   # інтеграційні тести
-├── benches/                 # критерії швидкості (ultra-speed)
-└── llama.cpp-master/        # опційно: git submodule на master
+│   ├── PLAN.md              # this plan
+│   ├── ARCHITECTURE.md      # architecture and diagrams
+│   ├── CONCEPT.md           # concept and design decisions
+│   └── DEVELOPMENT.md       # guide for Rust developers
+├── tests/                   # integration tests
+├── benches/                 # speed benchmarks (ultra-speed)
+└── llama.cpp-master/        # optional: git submodule pointing at master
 ```
 
-- У репозиторії не зберігати бінарники та артефакти збірки (`target/`, `llama.cpp/build/`).
-- Можливий **git submodule** на офіційний `llama.cpp` master замість копії в `../llama.cpp-master`.
+- Do not commit binaries or build artifacts (`target/`, `llama.cpp/build/`).
+- A **git submodule** to the official llama.cpp master can be used instead of a copy in `../llama.cpp-master`.
 
 ---
 
-## 3. Етапи реалізації
+## 3. Implementation Phases
 
-### Етап 1 — Hello Llama Rust (перший коміт)
+### Phase 1 — Hello Llama Rust (first commit)
 
-- [x] Ініціалізація Cargo-проєкту (lib + bin).
-- [x] `docs/PLAN.md` — план.
-- [x] `README.md` — опис проєкту як ультрашвидкого.
+- [x] Cargo project setup (lib + bin).
+- [x] `docs/PLAN.md` — plan.
+- [x] `README.md` — project description as ultra-fast.
 - [x] MIT `LICENSE`, `.gitignore`.
-- [x] Перший коміт: "hello llama rust", перший push (за бажанням — gittoken/remote).
+- [x] First commit: "hello llama rust"; first push (optional, with gittoken/remote).
 
-### Етап 2 — Інтеграція з master-папкою
+### Phase 2 — Integration with master folder
 
-- [ ] Визначити точний шлях до llama.cpp (змінна середовища або `build.rs`).
-- [ ] Збірка libllama (static) з `../llama.cpp-master` через `cmake` або `cc` у `build.rs`.
-- [ ] Генерація біндингів (e.g. `bindgen`) до `llama.h` / C API.
-- [ ] Тонкий unsafe-шар у `src/ffi` та safe-обгортки в `src/safe` або в `lib.rs`.
+- [ ] Define exact path to llama.cpp (environment variable or `build.rs`).
+- [ ] Build libllama (static) from `../llama.cpp-master` via cmake or cc in `build.rs`.
+- [ ] Generate bindings (e.g. `bindgen`) to `llama.h` / C API.
+- [ ] Thin unsafe layer in `src/ffi` and safe wrappers in `src/safe` or `lib.rs`.
 
-### Етап 3 — Документація та архітектура
+### Phase 3 — Documentation and architecture
 
-- [ ] `docs/ARCHITECTURE.md` — модулі, залежності, потік даних.
-- [ ] `docs/CONCEPT.md` — концепція (Rust-first, безпека, швидкість).
-- [ ] `docs/DEVELOPMENT.md` — як збирати, тестувати, бенчити (rustc, cargo).
+- [ ] `docs/ARCHITECTURE.md` — modules, dependencies, data flow.
+- [ ] `docs/CONCEPT.md` — concept (Rust-first, safety, speed).
+- [ ] `docs/DEVELOPMENT.md` — how to build, test, benchmark (rustc, cargo).
 
-### Етап 4 — Тести та ультрашвидкість
+### Phase 4 — Tests and ultra-speed
 
-- [ ] Unit-тести для safe API.
-- [ ] Інтеграційні тести (з мінімальною моделлю або mock).
-- [ ] `benches/` — benchmark’и (наприклад, токени/сек, час першого токена).
-- [ ] Документування результатів у `docs/` та перевірка збірки 64-bit exe.
-
----
-
-## 4. Інструменти
-
-- **rustc** — компілятор (через `cargo`).
-- **cargo** — збірка, тести, бенчі.
-- **git** — версіонування; при push — **gittoken** (Personal Access Token або credential helper).
+- [ ] Unit tests for safe API.
+- [ ] Integration tests (with minimal model or mock).
+- [ ] `benches/` — benchmarks (e.g. tokens/sec, time to first token).
+- [ ] Document results in `docs/` and verify 64-bit exe build.
 
 ---
 
-## 5. Цільова платформа
+## 4. Tools
 
-- **OS:** Windows (згідно з шляхами S:\rust\...).
-- **Target:** `x86_64-pc-windows-msvc` для отримання 64-бітного `.exe`.
+- **rustc** — compiler (via `cargo`).
+- **cargo** — build, test, bench.
+- **git** — version control; for push use **gittoken** (Personal Access Token or credential helper).
 
-Перевірка:
+---
+
+## 5. Target Platform
+
+- **OS:** Windows (per paths like S:\rust\...).
+- **Target:** `x86_64-pc-windows-msvc` for a 64-bit `.exe`.
+
+Verification:
 
 ```bash
 rustup default stable-x86_64-pc-windows-msvc
 cargo build --release
-# Результат: target/release/llama_rs.exe (або ім’я пакету з Cargo.toml)
+# Output: target/release/llama_rs.exe (or package name from Cargo.toml)
 ```
 
 ---
 
-## 6. Перший коміт
+## 6. First Commit
 
-- Повідомлення: **hello llama rust**
-- Вміст: план у `docs/`, README, LICENSE, `.gitignore`, мінімальний `src/lib.rs` та `src/main.rs`, що виводять привітання. Після цього — перший `git push` (з gittoken при потребі).
+- Message: **hello llama rust**
+- Contents: plan in `docs/`, README, LICENSE, `.gitignore`, minimal `src/lib.rs` and `src/main.rs` that print the greeting. Then the first `git push` (with gittoken if needed).
 
-Цей план є живим документом і може оновлюватися в `docs/` по мірі розвитку проєкту.
+This plan is a living document and may be updated in `docs/` as the project evolves.

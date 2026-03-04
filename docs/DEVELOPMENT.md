@@ -1,84 +1,86 @@
-# Розробка Llama-RS
+# Llama-RS Development Guide
 
-Покроковий гайд для Rust-розробника: збірка, тести, бенчмарки, git.
+Step-by-step guide for Rust developers: build, test, benchmarks, git.
 
-## Передумови
+## Prerequisites
 
-- **Rust**: встановлений через [rustup](https://rustup.rs).
+- **Rust**: installed via [rustup](https://rustup.rs).
 - **64-bit Windows target**:
   ```bash
   rustup default stable-x86_64-pc-windows-msvc
   ```
-  Для збірки MSVC-таргету потрібні **Build Tools for Visual Studio** (компонент "Desktop development with C++") — інакше з’явиться помилка `link.exe not found`. Альтернатива — GNU-таргет: `rustup default stable-x86_64-pc-windows-gnu` (потрібен MinGW-w64).
-- **llama.cpp**: клон або копія master гілки у сусідній папці (наприклад `../llama.cpp-master`). Точний шлях налаштовується в `build.rs` або через змінну середовища.
+  Building the MSVC target requires **Build Tools for Visual Studio** (the "Desktop development with C++" component); otherwise you will see `link.exe not found`. Alternative: GNU target — `rustup default stable-x86_64-pc-windows-gnu` (requires MinGW-w64).
+- **llama.cpp**: clone or copy of the master branch in a sibling folder (e.g. `../llama.cpp-master`). The exact path is configured in `build.rs` or via an environment variable.
 
-## Збірка
+## Build
 
 ```bash
 cd llama-rs-project
 cargo build
 ```
 
-Реліз (оптимізований 64-bit exe):
+Release (optimized 64-bit exe):
 
 ```bash
 cargo build --release
 ```
 
-Артефакт: `target\release\llama_rs.exe`.
+Artifact: `target\release\llama_rs.exe`.
 
-## Тести
+## Tests
 
 ```bash
 cargo test
 ```
 
-- Unit-тести в `src/lib.rs`.
-- Інтеграційні тести в `tests/`.
+- Unit tests in `src/lib.rs`.
+- Integration tests in `tests/`.
 
-## Бенчмарки (ультрашвидкість)
+## Benchmarks (ultra-speed)
 
 ```bash
 cargo bench
 ```
 
-Критерії швидкості описані в `benches/`. Після інтеграції з llama.cpp тут можна додати вимірювання токенів/сек та часу першого токена.
+Benchmarks are defined in `benches/`. After integrating with llama.cpp you can add metrics such as tokens/sec and time to first token.
 
-## Git та перший коміт
+## Git and first commit
 
-1. Ініціалізація (якщо ще не зроблено):
+1. Initialize (if not already done):
    ```bash
    cd llama-rs-project
    git init
    ```
 
-2. Додати файли та перший коміт:
+2. Stage and create the first commit:
    ```bash
    git add .
    git commit -m "hello llama rust"
    ```
 
-3. Віддалений репозиторій та push (з gittoken):
-   - Створити репо на GitHub/GitLab тощо.
-   - Додати remote:
+3. Remote repository and push (with gittoken):
+   - Create a repo on GitHub/GitLab etc.
+   - Add remote:
      ```bash
      git remote add origin https://github.com/YOUR_USER/llama-rs-project.git
      ```
-   - При авторизації використати Personal Access Token (gittoken) замість пароля:
+   - Use a **Personal Access Token** (gittoken) instead of a password. Example with token in URL:
      ```bash
-     git push -u origin main
+     git remote set-url origin https://YOUR_TOKEN@github.com/YOUR_USER/llama-rs-project.git
+     git push -u origin master
      ```
-   - Якщо гілка називається `master`: `git push -u origin master`.
+     Or enter the token as the password when running `git push` if using a credential manager.
+   - If your default branch is `main`: run `git branch -M main` then `git push -u origin main`.
 
-## Корисні команди
+## Useful commands
 
-| Дія           | Команда                |
-|---------------|------------------------|
-| Збірка        | `cargo build --release`|
-| Тести         | `cargo test`           |
-| Бенчмарки     | `cargo bench`          |
-| Перевірка     | `cargo check`          |
-| Лінтер        | `cargo clippy`         |
-| Формат        | `cargo fmt`            |
+| Action      | Command                 |
+|------------|-------------------------|
+| Build      | `cargo build --release` |
+| Test       | `cargo test`            |
+| Benchmarks | `cargo bench`           |
+| Check      | `cargo check`          |
+| Lint       | `cargo clippy`          |
+| Format     | `cargo fmt`             |
 
-Документація архітектури та плану — у [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [CONCEPT.md](CONCEPT.md).
+Architecture and plan documentation: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [CONCEPT.md](CONCEPT.md).
