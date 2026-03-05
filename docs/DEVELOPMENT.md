@@ -1,4 +1,4 @@
-# Llama-RS Development Guide
+# llama.rs Development Guide
 
 Step-by-step guide for Rust developers: build, test, benchmarks, git.
 

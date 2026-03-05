@@ -1,8 +1,8 @@
-//! Unified error type for Llama-RS (100% Rust API surface).
+//! Unified error type for llama.rs (100% Rust API surface).
 
 use std::path::PathBuf;
 
-/// Errors that can occur when using Llama-RS.
+/// Errors that can occur when using llama.rs.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("backend already initialized")]

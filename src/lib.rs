@@ -1,4 +1,4 @@
-//! Llama-RS — ultra-fast and safe Rust interface to llama.cpp.
+//! llama.rs — ultra-fast and safe Rust interface to llama.cpp.
 //!
 //! This library is **maximally Rust**: all public API and orchestration are written in safe Rust.
 //! FFI is confined to the `llama-cpp-2` dependency. You get:

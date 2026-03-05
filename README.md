@@ -1,6 +1,6 @@
-# Llama-RS · Ultra-fast & safe Llama on Rust
+# llama.rs · Ultra-fast & safe Llama on Rust
 
-**Llama-RS** is a Rust-first wrapper and CLI around [llama.cpp](https://github.com/ggml-org/llama.cpp), built for **speed**, **safety**, and **64-bit Windows** releases.
+**llama.rs** is a Rust-first wrapper and CLI around [llama.cpp](https://github.com/ggml-org/llama.cpp), built for **speed**, **safety**, and **64-bit Windows** releases.
 
 ## Why ultra-fast?
 

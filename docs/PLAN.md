@@ -1,4 +1,4 @@
-# Llama-RS Project Plan
+# llama.rs Project Plan
 
 ## Goal
 

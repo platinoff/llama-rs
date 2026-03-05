@@ -1,4 +1,4 @@
-//! Benchmarks for Llama-RS (ultra-speed verification).
+//! Benchmarks for llama.rs (ultra-speed verification).
 //!
 //! Run with: cargo bench
 //!

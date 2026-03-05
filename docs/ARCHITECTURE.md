@@ -1,8 +1,8 @@
-# Llama-RS Architecture
+# llama.rs Architecture
 
 ## Overview
 
-Llama-RS is built as a **Rust-first** layer on top of the llama.cpp C API. The architecture is split into layers with a minimal amount of unsafe code.
+llama.rs is built as a **Rust-first** layer on top of the llama.cpp C API. The architecture is split into layers with a minimal amount of unsafe code.
 
 ## Layers
 

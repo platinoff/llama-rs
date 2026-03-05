@@ -1,4 +1,4 @@
-//! CLI entry point for Llama-RS (64-bit release binary).
+//! CLI entry point for llama.rs (64-bit release binary).
 //!
 //! Usage:
 //!   llama_rs                      — print greeting
@@ -13,7 +13,7 @@ use std::path::Path;
 
 #[derive(Parser, Debug)]
 #[command(name = "llama_rs")]
-#[command(about = "Ultra-fast Rust wrapper around llama.cpp")]
+#[command(about = "llama.rs — ultra-fast Rust wrapper around llama.cpp")]
 struct Args {
     /// Path to the GGUF model file.
     #[arg(index = 1)]

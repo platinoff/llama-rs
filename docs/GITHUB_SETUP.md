@@ -1,4 +1,4 @@
-# GitHub setup for llama-rs
+# GitHub setup for llama.rs
 
 ## Create the repository
 

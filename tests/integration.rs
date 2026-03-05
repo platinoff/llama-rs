@@ -1,4 +1,4 @@
-//! Integration tests for Llama-RS.
+//! Integration tests for llama.rs.
 
 use llama_rs::{hello_llama_rust, GenerateOptions};
 

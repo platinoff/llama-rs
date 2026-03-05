@@ -1,4 +1,4 @@
-# Llama-RS Concept
+# llama.rs Concept
 
 ## Idea
 
