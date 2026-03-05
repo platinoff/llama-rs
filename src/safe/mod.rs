@@ -10,4 +10,6 @@ mod model;
 pub use backend::Backend;
 pub use context::{Context, GenerateOptions, GenerateOptionsBuilder};
 pub use generate::{generate, generate_stream};
+#[cfg(feature = "metrics")]
+pub use generate::generate_with_metrics;
 pub use model::Model;

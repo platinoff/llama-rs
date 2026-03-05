@@ -10,7 +10,7 @@ pub fn generate(
     prompt: &str,
     opts: &GenerateOptions,
 ) -> Result<String> {
-    super::context::generate_impl(&model.inner, context, prompt, opts, None)
+    super::context::generate_impl(&model.inner, context, prompt, opts, None, None)
 }
 
 /// Generate text from a prompt, calling `on_chunk` with each decoded text piece as it is produced.
@@ -25,5 +25,25 @@ pub fn generate_stream<F>(
 where
     F: FnMut(&str),
 {
-    super::context::generate_impl(&model.inner, context, prompt, opts, Some(&mut on_chunk))
+    super::context::generate_impl(&model.inner, context, prompt, opts, Some(&mut on_chunk), None)
+}
+
+/// Generate text and collect metrics (tokens generated, decode count, wall time). Requires feature `metrics`.
+#[cfg(feature = "metrics")]
+pub fn generate_with_metrics(
+    model: &Model,
+    context: &mut Context<'_>,
+    prompt: &str,
+    opts: &GenerateOptions,
+) -> Result<(String, crate::InferenceMetrics)> {
+    let mut metrics = crate::InferenceMetrics::default();
+    let s = super::context::generate_impl(
+        &model.inner,
+        context,
+        prompt,
+        opts,
+        None,
+        Some(&mut metrics),
+    )?;
+    Ok((s, metrics))
 }

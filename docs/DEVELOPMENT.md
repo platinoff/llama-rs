@@ -124,4 +124,4 @@ let opts = GenerateOptions::builder().max_tokens(32).build();
 let full = generate_stream(&model, &mut context, "Hi", &opts, |chunk| print!("{}", chunk))?;
 ```
 
-Architecture and plan documentation: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [CONCEPT.md](CONCEPT.md).
+See [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [CONCEPT.md](CONCEPT.md), [SIZING.md](SIZING.md).

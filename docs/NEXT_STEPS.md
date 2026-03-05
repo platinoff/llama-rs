@@ -21,7 +21,7 @@ Prioritized roadmap after Phase 1–4. Order: **stability → API ergonomics →
 | # | Step | Why |
 |---|------|-----|
 | 4 | ~~Builder for options~~ Done | GenerateOptions::builder().max_tokens(64).temperature(0.5).build().
-| 5 | **Typed params** | Re-export or wrap `LlamaModelParams` / `LlamaContextParams` with Rust-friendly defaults and docs (e.g. `ModelParams::default()`, `ContextParams::default()`) so users don’t need to touch llama-cpp-2 types for common use. |
+| 5 | ~~Typed params~~ Done | ModelParams, ContextParams re-exported in lib. Re-export or wrap `LlamaModelParams` / `LlamaContextParams` with Rust-friendly defaults and docs (e.g. `ModelParams::default()`, `ContextParams::default()`) so users don’t need to touch llama-cpp-2 types for common use. |
 | 6 | ~~Streaming~~ Done | generate_stream(model, context, prompt, opts, |chunk|) yields each piece; returns full string.
 
 **Outcome:** Pleasant, self-explanatory API for embedding and CLI.
@@ -32,9 +32,9 @@ Prioritized roadmap after Phase 1–4. Order: **stability → API ergonomics →
 
 | # | Step | Why |
 |---|------|-----|
-| 7 | **Benchmark time-to-first-token** | Add a bench that reports time from first `decode` to first sampled token (user-visible latency). |
-| 8 | **Structured metrics** | Optional `#[cfg(feature = "metrics")]` or a small module that records tokens generated, decode count, and wall time for logging/telemetry. |
-| 9 | **Batch size and context** | Document (and optionally validate) `n_batch` / `n_ctx` vs. memory and throughput; consider helpers or presets (e.g. “low memory”, “max speed”). |
+| 7 | ~~Benchmark time-to-first-token~~ Done | bench time_to_first_token when LLAMA_RS_BENCH_MODEL set.
+| 8 | ~~Structured metrics~~ Done | Feature metrics: InferenceMetrics, generate_with_metrics.
+| 9 | ~~Batch size and context~~ Done | docs/SIZING.md. Document (and optionally validate) `n_batch` / `n_ctx` vs. memory and throughput; consider helpers or presets (e.g. “low memory”, “max speed”). |
 
 **Outcome:** Measurable, tunable performance and clear docs for sizing.
 

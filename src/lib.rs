@@ -10,10 +10,14 @@
 //! - [ModelParams], [ContextParams] — defaults for model/context config
 
 mod error;
+mod metrics;
 mod safe;
 
 pub use error::{Error, Result};
+pub use metrics::InferenceMetrics;
 pub use safe::{generate, generate_stream, Backend, Context, GenerateOptions, GenerateOptionsBuilder, Model};
+#[cfg(feature = "metrics")]
+pub use safe::generate_with_metrics;
 
 /// Default params for loading a model. Re-export of [llama_cpp_2::model::params::LlamaModelParams].
 pub type ModelParams = llama_cpp_2::model::params::LlamaModelParams;

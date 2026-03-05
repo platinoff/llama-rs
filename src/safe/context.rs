@@ -1,11 +1,13 @@
 //! Safe context wrapper: decode, sample, generate.
 
 use crate::error::{Error, Result};
+use crate::InferenceMetrics;
 use encoding_rs;
 use llama_cpp_2::context::LlamaContext;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::sampling::LlamaSampler;
 use llama_cpp_2::token::LlamaToken;
+use std::time::Instant;
 
 /// Inference context tied to a [crate::Model]. All inference is done through the context.
 pub struct Context<'a> {
@@ -149,13 +151,16 @@ impl Default for GenerateOptions {
 
 /// Generate text from a prompt using the given context and model. Pure Rust orchestration.
 /// If `on_chunk` is `Some`, it is called with each decoded text piece (streaming).
+/// If `metrics` is `Some`, it is filled with tokens_generated, decode_count, wall_time_ms.
 pub(crate) fn generate_impl(
     model: &llama_cpp_2::model::LlamaModel,
     context: &mut Context<'_>,
     prompt: &str,
     opts: &GenerateOptions,
     mut on_chunk: Option<&mut dyn FnMut(&str)>,
+    mut metrics: Option<&mut InferenceMetrics>,
 ) -> Result<String> {
+    let start = Instant::now();
     let tokens = model
         .str_to_token(prompt, llama_cpp_2::model::AddBos::Always)
         .map_err(|e| Error::Tokenize(e.to_string()))?;
@@ -175,6 +180,9 @@ pub(crate) fn generate_impl(
         .add_sequence(&tokens, seq_id, false)
         .map_err(|e| Error::Decode(e.to_string()))?;
     context.decode(&mut batch)?;
+    if let Some(m) = metrics.as_mut() {
+        m.decode_count += 1;
+    }
 
     let mut sampler = LlamaSampler::chain_simple([
         LlamaSampler::temp(if opts.temperature <= 0.0 {
@@ -210,6 +218,9 @@ pub(crate) fn generate_impl(
             .map_err(|e| Error::Decode(e.to_string()))?;
         n_cur += 1;
         context.decode(&mut batch)?;
+        if let Some(m) = metrics.as_mut() {
+            m.decode_count += 1;
+        }
     }
 
     let mut s = String::new();
@@ -224,6 +235,10 @@ pub(crate) fn generate_impl(
             }
             Err(e) => return Err(Error::TokenToString(e.to_string())),
         }
+    }
+    if let Some(m) = metrics.as_mut() {
+        m.tokens_generated = output_tokens.len() as u32;
+        m.wall_time_ms = start.elapsed().as_millis() as u64;
     }
     Ok(s)
 }
