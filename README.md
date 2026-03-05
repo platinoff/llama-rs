@@ -4,23 +4,23 @@
 
 ## Why ultra-fast?
 
-- **Rust all the way** — Control flow, batching, and orchestration run in Rust; only the heavy inference stays in the native llama.cpp layer.
-- **Zero-cost abstractions** — Minimal allocations on the hot path; design avoids unnecessary copies where possible.
-- **64-bit native** — Release builds produce a single `llama_rs.exe` (x86_64-pc-windows-msvc) for maximum performance on modern hardware.
-- **Safe by default** — A thin FFI layer wraps the C API; the rest of the API is written in **safe Rust** for memory and thread safety.
+- **Rust all the way** — The entire public API and inference loop are written in **safe Rust** (>90% of this repo). FFI is confined to the `llama-cpp-2` dependency; no `unsafe` in our codebase.
+- **Zero-cost abstractions** — Thin wrappers (Backend, Model, Context, generate) add no extra allocation on the hot path.
+- **64-bit native** — Release builds produce a single `llama_rs.exe` (x86_64-pc-windows-msvc) for maximum performance.
+- **Safe by default** — Idiomatic `Result` and `Error` types; all orchestration (batching, sampling, token loop) in Rust.
 
 ## Quick start
 
 ```bash
-# Clone and build (requires Rust toolchain)
-cd llama-rs-project
+# Build (requires Rust; for 64-bit Windows MSVC also install "Desktop development with C++")
 cargo build --release
 
-# Run
+# Print greeting
 .\target\release\llama_rs.exe
-```
 
-You should see: **Hello, Llama Rust!**
+# Run with a GGUF model (and optional prompt)
+.\target\release\llama_rs.exe path\to\model.gguf "Your prompt"
+```
 
 ## Requirements
 

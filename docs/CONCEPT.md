@@ -4,6 +4,8 @@
 
 Maximum code in **Rust** for speed and safety; minimal, stable FFI to llama.cpp. The final product is a single 64-bit exe built with cargo.
 
+**Rust share:** All code in this repository is Rust. The only non-Rust is the `llama-cpp-2` (and its sys) dependency, which wraps and builds llama.cpp. So this project is **>90% Rust** by design (effectively 100% of *our* code).
+
 ## Principles
 
 1. **Safe by default** — Unsafe code only in an isolated FFI layer; everything else is safe Rust.

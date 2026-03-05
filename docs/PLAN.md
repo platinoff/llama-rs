@@ -61,10 +61,10 @@ llama-rs-project/
 
 ### Phase 2 — Integration with master folder
 
-- [ ] Define exact path to llama.cpp (environment variable or `build.rs`).
-- [ ] Build libllama (static) from `../llama.cpp-master` via cmake or cc in `build.rs`.
-- [ ] Generate bindings (e.g. `bindgen`) to `llama.h` / C API.
-- [ ] Thin unsafe layer in `src/ffi` and safe wrappers in `src/safe` or `lib.rs`.
+- [x] Use **llama-cpp-2** crate for FFI (builds/links llama.cpp; our code stays 100% Rust).
+- [x] Safe wrappers in `src/safe/`: Backend, Model, Context, GenerateOptions, generate.
+- [x] Idiomatic Error and Result in `src/error.rs`; all public API in Rust.
+- [ ] Optional: env or path to local llama.cpp master for custom build (see crate docs).
 
 ### Phase 3 — Documentation and architecture
 

@@ -1,7 +1,18 @@
-//! Llama-RS - ultra-fast and safe Rust interface to llama.cpp.
+//! Llama-RS — ultra-fast and safe Rust interface to llama.cpp.
 //!
-//! This library provides a Rust-first API for loading and running
-//! GGUF models via the llama.cpp master build.
+//! This library is **maximally Rust**: all public API and orchestration are written in safe Rust.
+//! FFI is confined to the `llama-cpp-2` dependency. You get:
+//!
+//! - [Backend] — initialize once per process
+//! - [Model] — load GGUF from path
+//! - [Context] — decode, sample, generate
+//! - [generate] — pure Rust text generation loop with [GenerateOptions]
+
+mod error;
+mod safe;
+
+pub use error::{Error, Result};
+pub use safe::{generate, Backend, Context, GenerateOptions, Model};
 
 /// Returns the greeting string for the first run.
 #[must_use]

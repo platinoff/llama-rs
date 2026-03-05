@@ -13,24 +13,24 @@ Llama-RS is built as a **Rust-first** layer on top of the llama.cpp C API. The a
 │  Public API (lib.rs, safe Rust)                          │
 │  - Model loading, context, sampling, batching            │
 ├─────────────────────────────────────────────────────────┤
-│  Safe wrappers (optional: src/safe/)                     │
-│  - RAII, Result, idiomatic types                        │
+│  Safe wrappers (src/safe/)                              │
+│  - Backend, Model, Context, GenerateOptions, generate   │
 ├─────────────────────────────────────────────────────────┤
-│  FFI layer (optional: src/ffi/)                         │
-│  - bindgen-generated + thin unsafe wrappers             │
+│  llama-cpp-2 crate (FFI to llama.cpp)                  │
 ├─────────────────────────────────────────────────────────┤
-│  llama.cpp (C/C++) — libllama static                     │
-│  - Built from ../llama.cpp-master                        │
+│  llama.cpp (C/C++) — built/linked by llama-cpp-sys-2    │
 └─────────────────────────────────────────────────────────┘
 ```
 
-## Modules (future structure)
+## Modules
 
-| Module   | Purpose |
-|----------|---------|
-| `lib.rs` | Public API, re-exports, `hello_llama_rust` and future functions |
-| `ffi`    | Low-level C API calls (unsafe), generated via bindgen |
-| `safe`   | Safe wrappers (Context, Model, Sampler, etc.) |
+| Module    | Purpose |
+|-----------|---------|
+| `lib.rs`  | Public API (safe Rust): Backend, Model, Context, generate, Error, Result. |
+| `error.rs`| Unified Error and Result; conversions from llama-cpp-2 errors. |
+| `safe/`   | Safe wrappers: Backend, Model, Context, GenerateOptions, generate (pure Rust loop). |
+
+FFI is confined to the **llama-cpp-2** dependency; no unsafe code in this repository.
 
 ## Data flow (future inference)
 
@@ -41,8 +41,8 @@ Llama-RS is built as a **Rust-first** layer on top of the llama.cpp C API. The a
 
 ## Build dependencies
 
-- **build.rs**: Resolves path to llama.cpp (env or relative), invokes cmake/cc to build libllama, and bindgen if needed.
-- **Cargo.toml**: Dependencies such as `cmake`, `bindgen` (if using custom bindings); alternatively the `llama-cpp-2` crate with a path to a local build.
+- **Cargo.toml**: `llama-cpp-2` (with optional `sampler` feature); the crate builds/links llama.cpp.
+- No custom `build.rs` in this repo; 100% of our code is Rust.
 
 ## Target platform
 
