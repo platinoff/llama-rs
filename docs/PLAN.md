@@ -64,7 +64,7 @@ llama-rs-project/
 - [x] Use **llama-cpp-2** crate for FFI (builds/links llama.cpp; our code stays 100% Rust).
 - [x] Safe wrappers in `src/safe/`: Backend, Model, Context, GenerateOptions, generate.
 - [x] Idiomatic Error and Result in `src/error.rs`; all public API in Rust.
-- [ ] Optional: env or path to local llama.cpp master for custom build (see crate docs).
+- [x] No local llama.cpp build — we keep 100% Rust; backend from `llama-cpp-2` only.
 
 ### Phase 3 — Documentation and architecture
 

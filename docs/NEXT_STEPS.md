@@ -1,5 +1,7 @@
 # Next Steps — Development Priorities (Rust Architect View)
 
+**Principles:** This repo is **100% Rust** and **ultra-fast**. We do **not** build from a local llama.cpp; the backend is the one provided by the `llama-cpp-2` dependency.
+
 Prioritized roadmap after Phase 1–4. Order: **stability → API ergonomics → performance → features**.
 
 ---
@@ -44,7 +46,7 @@ Prioritized roadmap after Phase 1–4. Order: **stability → API ergonomics →
 
 | # | Step | Why |
 |---|------|-----|
-| 10 | **Optional local llama.cpp** | If needed: env or config to point at a local llama.cpp master for custom build (see Phase 2 optional in PLAN.md). |
+| 10 | ~~Optional local llama.cpp~~ Skipped | We keep 100% Rust (no local C++ build); backend from crate only. |
 | 11 | ~~Stop sequences~~ Done | GenerateOptions.stop_sequences, builder .stop_sequence(s), match after each token.
 | 12 | ~~CLI flags~~ Done | clap: --max-tokens, --temperature, --seed, --no-eos, --system.
 | 13 | ~~Embeddings API~~ Done | Feature embeddings: embed(model, context, text) -> Vec<f32>.
@@ -59,25 +61,25 @@ Prioritized roadmap after Phase 1–4. Order: **stability → API ergonomics →
 P0: deprecation fix → error context → CI
 P1: GenerateOptions builder → typed params → generate_stream
 P2: time-to-first-token bench → metrics feature → n_batch/n_ctx docs
-P3: local llama.cpp (optional) → stop sequences → CLI flags → embeddings (optional)
+P3: stop sequences → CLI flags → embeddings (no local llama.cpp)
 ```
 
 Update this list as items are done or reprioritized.
 
 ---
 
-## What to do next (in order)
+## What to do next (100% Rust, ultra-fast)
 
-1. **P3.10 — Optional local llama.cpp** (only remaining item)  
-   If you need to build against a custom llama.cpp checkout: add env or config (e.g. `LLAMA_CPP_PATH`) and wire it in build or via llama-cpp-2 docs. Skip if the bundled build is enough.
-
-2. **Maintenance and polish**
+1. **Maintenance**
    - Bump `llama-cpp-2` when a new version is released; run tests and fix any breaking changes.
-   - Add more integration tests or examples if you add new use cases.
-   - Optionally: publish crate to crates.io (`cargo publish`), add a short CHANGELOG.
+   - Keep CI green (Windows); add Linux/macOS jobs if you need multi-platform.
 
-3. **Possible future work**
-   - **Multi-platform CI** — add Linux/macOS to GitHub Actions.
-   - **Chat / tool-calling** — if llama-cpp-2 adds chat templates or tools, expose them in the API.
-   - **Embedding normalization** — optional mean-pool or L2 norm for `embed()` output when using embedding models.
+2. **Polish**
+   - Add integration tests or examples for new use cases.
+   - Optionally: publish to crates.io (`cargo publish`), add a short CHANGELOG.
+
+3. **Optional improvements (still 100% Rust, ultra-fast)**
    - **Presets** — `ContextParams` helpers like `low_memory()` / `max_speed()` (see SIZING.md).
+   - **Chat / tool-calling** — if llama-cpp-2 adds chat templates or tools, expose them in the API.
+   - **Embedding normalization** — optional mean-pool or L2 norm for `embed()` when using embedding models.
+
