@@ -13,7 +13,7 @@
 
 ### Easy install (Windows)
 
-Якщо вже встановлені **Rust** ([rustup](https://rustup.rs)) та **Visual Studio Build Tools** з workload’ами **"Desktop development with C++"** і **"C++ Clang tools for Windows"**, достатньо одного скрипта:
+If you already have **Rust** ([rustup](https://rustup.rs)) and **Visual Studio Build Tools** with the **"Desktop development with C++"** and **"C++ Clang tools for Windows"** workloads, a single script is enough:
 
 ```powershell
 git clone https://github.com/platinoff/llama-rs.git
@@ -21,41 +21,41 @@ cd llama-rs
 .\install.ps1
 ```
 
-**Що робить скрипт:** шукає `libclang.dll` (потрібен для збірки бекенду llama.cpp), виставляє змінну `LIBCLANG_PATH`, запускає середовище MSVC (`VsDevCmd`) і виконує `cargo build --release`. Після успішної збірки ви отримаєте виконуваний файл `.\target\release\llama_rs.exe`.
+**What the script does:** it locates `libclang.dll` (needed to build the llama.cpp backend), sets `LIBCLANG_PATH`, runs the MSVC environment (`VsDevCmd`), and runs `cargo build --release`. After a successful build you get `.\target\release\llama_rs.exe`.
 
-**Запуск:**
+**Run:**
 
 ```powershell
 .\target\release\llama_rs.exe
-# або з моделлю GGUF:
+# or with a GGUF model:
 .\target\release\llama_rs.exe path\to\model.gguf "Your prompt"
 ```
 
-Якщо скрипт не знаходить Clang або VsDevCmd — перевірте [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#prerequisites). Нижче — покрокова збірка вручну, якщо хочете розуміти кожен крок.
+If the script cannot find Clang or VsDevCmd, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#prerequisites). Below is the step-by-step manual build if you want to understand each step.
 
 ---
 
-### Покрокова збірка (ручна)
+### Step-by-step build (manual)
 
-**1. Клонування репозиторію**
+**1. Clone the repo**
 
 ```bash
 git clone https://github.com/platinoff/llama-rs.git
 cd llama-rs
 ```
 
-(Якщо клонували в іншу папку — далі підставляйте її замість `llama-rs`.)
+(If you cloned to a different folder, use that path instead of `llama-rs` below.)
 
-**2. Що потрібно один раз (prerequisites)**
+**2. Prerequisites (one-time)**
 
-- **Rust** — [rustup](https://rustup.rs), далі наприклад `rustup default stable-x86_64-pc-windows-msvc` для 64-бітної Windows. Потрібен для компіляції коду llama.rs і виклику збірки через `cargo`.
-- **Visual Studio Build Tools** — workload **"Desktop development with C++"**: дає лінкер `link.exe` і середовище MSVC, без нього Rust не збере програму під Windows.
-- **Clang** — у VS Installer виберіть **"C++ Clang tools for Windows"**. Збірка крейту `llama-cpp-2` використовує `libclang.dll` для парсингу C/C++ заголовків; без цього кроку збірка впаде з помилкою про `LIBCLANG_PATH`.  
-  Детально: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#prerequisites).
+- **Rust** — [rustup](https://rustup.rs), then e.g. `rustup default stable-x86_64-pc-windows-msvc` for 64-bit Windows. Required to compile llama.rs and run the build via `cargo`.
+- **Visual Studio Build Tools** — install the **"Desktop development with C++"** workload: provides `link.exe` and the MSVC environment; without it Rust cannot build the Windows binary.
+- **Clang** — in VS Installer, add **"C++ Clang tools for Windows"**. The `llama-cpp-2` crate uses `libclang.dll` to parse C/C++ headers; without this the build will fail with an error about `LIBCLANG_PATH`.  
+  Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#prerequisites).
 
-**3. Збірка**
+**3. Build**
 
-На **Windows** потрібні середовище MSVC і змінна `LIBCLANG_PATH`. У PowerShell (шлях до Clang можна змінити під свою версію VS):
+On **Windows** you need the MSVC environment and `LIBCLANG_PATH`. In PowerShell (adjust the Clang path if your VS version differs):
 
 ```powershell
 cd llama-rs
@@ -63,9 +63,9 @@ $env:LIBCLANG_PATH = "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildToo
 cmd /c "`"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat`" -arch=amd64 && cd /d %CD% && cargo build --release"
 ```
 
-**Що це робить:** `LIBCLANG_PATH` вказує, де взяти `libclang.dll`. `VsDevCmd.bat` налаштовує PATH і змінні для лінкера MSVC. `cargo build --release` компілює проект у режимі release; результат — `target\release\llama_rs.exe`.
+**What this does:** `LIBCLANG_PATH` tells the build where to find `libclang.dll`. `VsDevCmd.bat` sets up PATH and other variables for the MSVC linker. `cargo build --release` compiles the project in release mode; the result is `target\release\llama_rs.exe`.
 
-Або відкрийте **"x64 Native Tools Command Prompt for VS"** з меню Пуск і виконайте:
+Or open **"x64 Native Tools Command Prompt for VS"** from the Start menu and run:
 
 ```cmd
 set LIBCLANG_PATH=C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\Llvm\x64\bin
@@ -73,15 +73,15 @@ cd path\to\llama-rs
 cargo build --release
 ```
 
-**4. Запуск**
+**4. Run**
 
 ```bash
 .\target\release\llama_rs.exe
-# з моделлю GGUF:
+# with a GGUF model:
 .\target\release\llama_rs.exe path\to\model.gguf "Your prompt"
 ```
 
-Перший запуск без аргументів виводить привітання; з шляхом до моделі — завантажує її і генерує текст. Детальніше: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Running with no arguments prints the greeting; with a model path it loads the model and generates text. More: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Requirements
 
