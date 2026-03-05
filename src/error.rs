@@ -30,17 +30,22 @@ pub enum Error {
 impl From<llama_cpp_2::LlamaCppError> for Error {
     fn from(e: llama_cpp_2::LlamaCppError) -> Self {
         use llama_cpp_2::LlamaCppError;
-        let msg = e.to_string();
         match &e {
             LlamaCppError::BackendAlreadyInitialized => Error::BackendAlreadyInitialized,
-            LlamaCppError::LlamaModelLoadError(_) => Error::ModelLoad {
-                path: PathBuf::new(),
-                message: msg,
-            },
-            LlamaCppError::LlamaContextLoadError(_) => Error::ContextCreate(msg),
-            LlamaCppError::DecodeError(_) => Error::Decode(msg),
-            LlamaCppError::BatchAddError(_) => Error::Decode(msg),
-            _ => Error::ContextCreate(msg),
+            LlamaCppError::LlamaModelLoadError(inner) => {
+                let path = match inner {
+                    llama_cpp_2::LlamaModelLoadError::PathToStrError(p) => p.clone(),
+                    _ => PathBuf::new(),
+                };
+                Error::ModelLoad {
+                    path,
+                    message: inner.to_string(),
+                }
+            }
+            LlamaCppError::LlamaContextLoadError(_) => Error::ContextCreate(e.to_string()),
+            LlamaCppError::DecodeError(_) => Error::Decode(e.to_string()),
+            LlamaCppError::BatchAddError(_) => Error::Decode(e.to_string()),
+            _ => Error::ContextCreate(e.to_string()),
         }
     }
 }
@@ -65,8 +70,12 @@ impl From<llama_cpp_2::llama_batch::BatchAddError> for Error {
 
 impl From<llama_cpp_2::LlamaModelLoadError> for Error {
     fn from(e: llama_cpp_2::LlamaModelLoadError) -> Self {
+        let path = match &e {
+            llama_cpp_2::LlamaModelLoadError::PathToStrError(p) => p.clone(),
+            _ => PathBuf::new(),
+        };
         Error::ModelLoad {
-            path: PathBuf::new(),
+            path,
             message: e.to_string(),
         }
     }

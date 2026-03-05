@@ -81,6 +81,12 @@ llama-rs-project/
 
 ---
 
+## Next steps (prioritized)
+
+See **[NEXT_STEPS.md](NEXT_STEPS.md)** for the Rust-architect roadmap: P0 stability → P1 API ergonomics → P2 performance → P3 features.
+
+---
+
 ## 4. Tools
 
 - **rustc** — compiler (via `cargo`).

@@ -1,6 +1,7 @@
 //! Safe context wrapper: decode, sample, generate.
 
 use crate::error::{Error, Result};
+use encoding_rs;
 use llama_cpp_2::context::LlamaContext;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::sampling::LlamaSampler;
@@ -141,11 +142,11 @@ pub(crate) fn generate_impl(
     }
 
     let mut s = String::new();
-    #[allow(deprecated)]
-    let special = llama_cpp_2::model::Special::Plaintext;
+    let mut decoder = encoding_rs::UTF_8.new_decoder();
     for t in &output_tokens {
-        if let Ok(piece) = model.token_to_str(*t, special) {
-            s.push_str(&piece);
+        match model.token_to_piece(*t, &mut decoder, false, None) {
+            Ok(piece) => s.push_str(&piece),
+            Err(e) => return Err(Error::TokenToString(e.to_string())),
         }
     }
     Ok(s)
