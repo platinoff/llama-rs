@@ -68,16 +68,16 @@ llama-rs-project/
 
 ### Phase 3 — Documentation and architecture
 
-- [ ] `docs/ARCHITECTURE.md` — modules, dependencies, data flow.
-- [ ] `docs/CONCEPT.md` — concept (Rust-first, safety, speed).
-- [ ] `docs/DEVELOPMENT.md` — how to build, test, benchmark (rustc, cargo).
+- [x] `docs/ARCHITECTURE.md` — modules, dependencies, data flow.
+- [x] `docs/CONCEPT.md` — concept (Rust-first, safety, speed).
+- [x] `docs/DEVELOPMENT.md` — how to build, test, benchmark (rustc, cargo).
 
 ### Phase 4 — Tests and ultra-speed
 
-- [ ] Unit tests for safe API.
-- [ ] Integration tests (with minimal model or mock).
-- [ ] `benches/` — benchmarks (e.g. tokens/sec, time to first token).
-- [ ] Document results in `docs/` and verify 64-bit exe build.
+- [x] Unit tests for safe API (lib.rs, GenerateOptions, Error).
+- [x] Integration tests (greeting, GenerateOptions; optional model test via env).
+- [x] `benches/` — speed benchmark (hello); inference metrics documented in `docs/BENCHMARKS.md`.
+- [x] 64-bit exe build verified (release).
 
 ---
 

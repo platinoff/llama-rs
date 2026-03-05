@@ -103,4 +103,20 @@ Benchmarks are defined in `benches/`. After integrating with llama.cpp you can a
 | Lint       | `cargo clippy`          |
 | Format     | `cargo fmt`             |
 
+See [BENCHMARKS.md](BENCHMARKS.md) for speed benchmarks and inference metrics.
+
+## API usage example
+
+```rust
+use llama_rs::{Backend, Model, Context, GenerateOptions, generate};
+use llama_cpp_2::model::params::LlamaModelParams;
+use llama_cpp_2::context::params::LlamaContextParams;
+use std::path::Path;
+
+let backend = Backend::init()?;
+let model = Model::load_from_file(&backend, Path::new("model.gguf"), &LlamaModelParams::default())?;
+let mut context = model.new_context(&backend, LlamaContextParams::default())?;
+let out = generate(&model, &mut context, "Hello", &GenerateOptions::default())?;
+```
+
 Architecture and plan documentation: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [CONCEPT.md](CONCEPT.md).

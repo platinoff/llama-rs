@@ -32,12 +32,12 @@ Llama-RS is built as a **Rust-first** layer on top of the llama.cpp C API. The a
 
 FFI is confined to the **llama-cpp-2** dependency; no unsafe code in this repository.
 
-## Data flow (future inference)
+## Data flow (inference)
 
-1. **Model load** — GGUF path → FFI `llama_load_model_from_file` → safe `Model`.
-2. **Context** — `Model` + params → `llama_new_context_with_model` → safe `Context`.
-3. **Decode** — Rust builds `llama_batch`, calls `llama_decode` → logits returned to Rust.
-4. **Sampling** — logits → sampler API → next token; loop in Rust.
+1. **Model load** — GGUF path → `Model::load_from_file(backend, path, params)` → safe `Model`.
+2. **Context** — `model.new_context(backend, ctx_params)` → safe `Context`.
+3. **Generate** — `generate(&model, &mut context, prompt, &opts)` runs in Rust: tokenize → batch decode → sampler → accept token → repeat until EOS or max_tokens.
+4. **Sampling** — LlamaSampler (temp, top_k, top_p, dist) applied in Rust; single token decoded per step via llama-cpp-2.
 
 ## Build dependencies
 
