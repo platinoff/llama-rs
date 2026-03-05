@@ -11,32 +11,6 @@
 
 ## Quick start
 
-### Easy install (Windows)
-
-If you already have **Rust** ([rustup](https://rustup.rs)) and **Visual Studio Build Tools** with the **"Desktop development with C++"** and **"C++ Clang tools for Windows"** workloads, a single script is enough:
-
-```powershell
-git clone https://github.com/platinoff/llama-rs.git
-cd llama-rs
-.\install.ps1
-```
-
-**What the script does:** it locates `libclang.dll` (needed to build the llama.cpp backend), sets `LIBCLANG_PATH`, runs the MSVC environment (`VsDevCmd`), and runs `cargo build --release`. After a successful build you get `.\target\release\llama_rs.exe`.
-
-**Run:**
-
-```powershell
-.\target\release\llama_rs.exe
-# or with a GGUF model:
-.\target\release\llama_rs.exe path\to\model.gguf "Your prompt"
-```
-
-If the script cannot find Clang or VsDevCmd, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#prerequisites). Below is the step-by-step manual build if you want to understand each step.
-
----
-
-### Step-by-step build (manual)
-
 **1. Clone the repo**
 
 ```bash
@@ -68,12 +42,12 @@ cmd /c "`"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\T
 Or open **"x64 Native Tools Command Prompt for VS"** from the Start menu and run:
 
 ```cmd
-set LIBCLANG_PATH=C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\Llvm\x64\bin
+set "LIBCLANG_PATH=C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\Llvm\x64\bin"
 cd path\to\llama-rs
 cargo build --release
 ```
 
-**4. Run**
+**4. Run the binary**
 
 ```bash
 .\target\release\llama_rs.exe
@@ -82,6 +56,20 @@ cargo build --release
 ```
 
 Running with no arguments prints the greeting; with a model path it loads the model and generates text. More: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+## Cargo commands
+
+Use these from the project root (on Windows, use the same environment as in step 3 above: `LIBCLANG_PATH` set and MSVC via VsDevCmd or **x64 Native Tools Command Prompt**).
+
+| Command | Description |
+|--------|--------------|
+| `cargo build --release` | Build the release binary → `target/release/llama_rs.exe` |
+| `cargo test` | Run unit tests (in `src/`) and integration tests (in `tests/*.rs`) |
+| `cargo bench` | Run benchmarks (in `benches/`, release mode) |
+| `.\target\release\llama_rs.exe` | Run the compiled CLI (no args = greeting) |
+| `.\target\release\llama_rs.exe <model.gguf> "prompt"` | Run inference with a GGUF model |
+
+**Tests** live in the `tests/` folder as `*.rs` files (e.g. `tests/integration.rs`). Run them with `cargo test`. You can also smoke-test the built exe manually: run `.\target\release\llama_rs.exe` to see the greeting, or pass a model path and prompt for a quick CLI check.
 
 ## Requirements
 
@@ -93,7 +81,6 @@ Running with no arguments prints the greeting; with a model path it loads the mo
 
 | Path         | Description |
 |-------------|-------------|
-| `install.ps1` | Easy install script (Windows): sets LIBCLANG_PATH, runs MSVC + cargo build |
 | `src/lib.rs`  | Public API (Rust) |
 | `src/main.rs` | CLI (64-bit exe) |
 | `src/safe/`   | Backend, Model, Context, generate, generate_stream, embed |
