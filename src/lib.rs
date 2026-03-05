@@ -1,4 +1,7 @@
-//! llama.rs — ultra-fast and safe Rust interface to llama.cpp.
+//! llama.rs — Llama in Rust.
+//!
+//! Rust-native inference API and orchestration; the compute backend is llama.cpp (via `llama-cpp-2`).
+//! All code in this crate is safe Rust.
 //!
 //! This library is **maximally Rust**: all public API and orchestration are written in safe Rust.
 //! FFI is confined to the `llama-cpp-2` dependency. You get:

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Define the architecture of a Rust project that works with **llama.cpp** (master), with maximum Rust code for ultra-fast and safe operation, producing a 64-bit `.exe`.
+**llama.rs** — a Rust project for Llama inference: **maximum Rust**, minimal FFI. All API and orchestration in Rust; [llama.cpp](https://github.com/ggml-org/llama.cpp) is the linked backend. Result: a 64-bit `.exe` built with cargo.
 
 ---
 
@@ -11,7 +11,7 @@ Define the architecture of a Rust project that works with **llama.cpp** (master)
 | Requirement | Solution |
 |-------------|----------|
 | Llama source | Folder `../llama.cpp-master` (or `llama.cpp-master/llama.cpp-master` if nested) |
-| Language | Maximum Rust, minimum FFI to C/C++ |
+| Language | Maximum Rust; llama.cpp only as linked backend |
 | Safety | Safe Rust API; unsafe code only in a thin bindings layer |
 | Speed | Zero-copy where possible, batching, minimal allocations on the inference path |
 | Build output | `target/release/llama_rs.exe` (x86_64-pc-windows-msvc) |

@@ -2,9 +2,9 @@
 
 ## Idea
 
-Maximum code in **Rust** for speed and safety; minimal, stable FFI to llama.cpp. The final product is a single 64-bit exe built with cargo.
+**llama.rs = Llama in Rust.** The project is a **Rust implementation** of Llama inference: all application code, API, and orchestration are in Rust. The actual model evaluation (tensor ops, KV cache) is delegated to **llama.cpp** via the `llama-cpp-2` crate — so we get a single 64-bit exe built with cargo, with **maximum Rust** and minimal FFI.
 
-**Rust share:** All code in this repository is Rust. The only non-Rust is the `llama-cpp-2` (and its sys) dependency, which wraps and builds llama.cpp. So this project is **>90% Rust** by design (effectively 100% of *our* code).
+**Rust share:** 100% of the code in this repository is Rust. There is no C/C++ in the repo. The only non-Rust is the linked llama.cpp library built by the `llama-cpp-2` dependency. So **llama.rs is the Rust side; llama.cpp is the backend.**
 
 ## Principles
 
@@ -16,8 +16,7 @@ Maximum code in **Rust** for speed and safety; minimal, stable FFI to llama.cpp.
 
 ## Data source
 
-- The working **llama.cpp** version is taken from the **master** folder (e.g. `S:\rust\llama-rs\llama.cpp-master` or nested `llama.cpp-master/llama.cpp-master`).
-- Building libllama is done during `cargo build` (build.rs) or manually with subsequent linking.
+- **llama.cpp** is built automatically by the `llama-cpp-2` crate during `cargo build` (no manual clone required). Optionally, a local llama.cpp path can be used if the crate supports it.
 
 ## Development tools
 

@@ -2,7 +2,7 @@
 name = "llama_rs"
 version = "0.1.0"
 edition = "2021"
-description = "llama.rs — ultra-fast and safe Rust wrapper around llama.cpp"
+description = "llama.rs — Llama in Rust: Rust-native inference API, backend by llama.cpp"
 license = "MIT"
 readme = "README.md"
 repository = ""

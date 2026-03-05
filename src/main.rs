@@ -13,7 +13,7 @@ use std::path::Path;
 
 #[derive(Parser, Debug)]
 #[command(name = "llama_rs")]
-#[command(about = "llama.rs — ultra-fast Rust wrapper around llama.cpp")]
+#[command(about = "llama.rs — Llama in Rust (backend: llama.cpp)")]
 struct Args {
     /// Path to the GGUF model file.
     #[arg(index = 1)]

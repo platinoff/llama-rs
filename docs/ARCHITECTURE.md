@@ -2,24 +2,24 @@
 
 ## Overview
 
-llama.rs is built as a **Rust-first** layer on top of the llama.cpp C API. The architecture is split into layers with a minimal amount of unsafe code.
+**llama.rs** is implemented in **Rust**. The public API, inference loop (tokenize → decode → sample → generate), streaming, options, and error handling are all Rust. The only non-Rust is the **llama.cpp** library, which is linked as the **backend** for model evaluation (tensor ops, KV cache). So: **llama.rs = Rust; llama.cpp = backend.**
 
 ## Layers
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  CLI / Application (main.rs, safe Rust)                 │
+│  CLI / Application (main.rs — Rust)                     │
 ├─────────────────────────────────────────────────────────┤
-│  Public API (lib.rs, safe Rust)                          │
-│  - Model loading, context, sampling, generate, stream    │
+│  Public API (lib.rs — Rust)                              │
+│  - Model, Context, generate, generate_stream, embed      │
 ├─────────────────────────────────────────────────────────┤
-│  Safe wrappers (src/safe/)                              │
-│  - Backend, Model, Context, GenerateOptions, generate,  │
-│    generate_stream, ModelParams, ContextParams        │
+│  llama.rs logic (src/safe/ — Rust)                       │
+│  - Backend, Model, Context, GenerateOptions, generate,   │
+│    generate_stream, embed (orchestration in Rust)        │
 ├─────────────────────────────────────────────────────────┤
-│  llama-cpp-2 crate (FFI to llama.cpp)                  │
+│  llama-cpp-2 (FFI bindings to backend)                  │
 ├─────────────────────────────────────────────────────────┤
-│  llama.cpp (C/C++) — built/linked by llama-cpp-sys-2    │
+│  llama.cpp (C/C++) — backend, built by llama-cpp-sys-2   │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -31,7 +31,7 @@ llama.rs is built as a **Rust-first** layer on top of the llama.cpp C API. The a
 | `error.rs`| Unified Error and Result; conversions from llama-cpp-2 errors. |
 | `safe/`   | Safe wrappers: Backend, Model, Context, GenerateOptions + builder, generate, generate_stream (pure Rust loop). |
 
-FFI is confined to the **llama-cpp-2** dependency; no unsafe code in this repository.
+FFI is confined to the **llama-cpp-2** dependency; **no unsafe code and no C/C++ in this repository.** All orchestration is Rust.
 
 ## Data flow (inference)
 
@@ -49,4 +49,4 @@ FFI is confined to the **llama-cpp-2** dependency; no unsafe code in this reposi
 
 - **x86_64-pc-windows-msvc** — release artifact: a single 64-bit `llama_rs.exe`.
 
-This document will be updated as new modules and llama.cpp integration are added.
+This document will be updated as new modules are added. The rule remains: **llama.rs = Rust; llama.cpp = backend.**

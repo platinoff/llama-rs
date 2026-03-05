@@ -1,13 +1,13 @@
-# llama.rs · Ultra-fast & safe Llama on Rust
+# llama.rs · Llama in Rust
 
-**llama.rs** is a Rust-first wrapper and CLI around [llama.cpp](https://github.com/ggml-org/llama.cpp), built for **speed**, **safety**, and **64-bit Windows** releases.
+**llama.rs** is a **Rust-native** implementation of Llama inference: API, orchestration, and control flow are written in Rust. The compute backend is [llama.cpp](https://github.com/ggml-org/llama.cpp) (via the `llama-cpp-2` crate), but **this codebase is 100% Rust** — no C/C++ in the repo.
 
-## Why ultra-fast?
+## Why Rust all the way?
 
-- **Rust all the way** — The entire public API and inference loop are written in **safe Rust** (>90% of this repo). FFI is confined to the `llama-cpp-2` dependency; no `unsafe` in our codebase.
+- **llama.rs, not llama.cpp** — All code you see here is **Rust**. The inference loop (tokenize → decode → sample → accept) lives in `src/safe/`; only the heavy math runs in the linked llama.cpp backend.
 - **Zero-cost abstractions** — Thin wrappers (Backend, Model, Context, generate) add no extra allocation on the hot path.
-- **64-bit native** — Release builds produce a single `llama_rs.exe` (x86_64-pc-windows-msvc) for maximum performance.
-- **Safe by default** — Idiomatic `Result` and `Error` types; all orchestration (batching, sampling, token loop) in Rust.
+- **64-bit native** — Release builds produce a single `llama_rs.exe` (x86_64-pc-windows-msvc).
+- **Safe by default** — Idiomatic `Result` and `Error`; no `unsafe` in this repository.
 
 ## Quick start
 
@@ -25,17 +25,20 @@ cargo build --release
 ## Requirements
 
 - **Rust** 1.70+ (`rustup default stable-x86_64-pc-windows-msvc` for 64-bit Windows).
-- **llama.cpp** — Master branch used from a sibling folder (e.g. `../llama.cpp-master`); see [docs/PLAN.md](docs/PLAN.md) and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+- **Backend:** llama.cpp is built and linked automatically by the `llama-cpp-2` dependency; see [docs/PLAN.md](docs/PLAN.md) and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Project layout
 
-| Path        | Description                          |
-|------------|--------------------------------------|
-| `src/lib.rs` | Core library and public API          |
-| `src/main.rs`| CLI entry point (64-bit exe)         |
-| `docs/`      | Plan, architecture, and dev guides   |
-| `tests/`    | Integration tests                    |
-| `benches/`  | Performance benchmarks               |
+| Path         | Description |
+|-------------|-------------|
+| `src/lib.rs`  | Public API (Rust) |
+| `src/main.rs` | CLI (64-bit exe) |
+| `src/safe/`   | Backend, Model, Context, generate, generate_stream, embed |
+| `src/error.rs`| Error and Result types |
+| `src/metrics.rs` | InferenceMetrics (optional feature) |
+| `docs/`       | Plan, architecture, guides |
+| `tests/`      | Integration tests |
+| `benches/`    | Benchmarks |
 
 ## Documentation
 
@@ -43,6 +46,20 @@ cargo build --release
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Architecture and module layout.
 - [docs/CONCEPT.md](docs/CONCEPT.md) — Design concepts (Rust-first, safety, speed).
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — Build, test, benchmark (rustc, cargo, git).
+- [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md) — Prioritized roadmap.
+- [docs/BENCHMARKS.md](docs/BENCHMARKS.md) — Benchmarks and metrics.
+- [docs/SIZING.md](docs/SIZING.md) — n_ctx / n_batch and memory.
+- [docs/GITHUB_SETUP.md](docs/GITHUB_SETUP.md) — GitHub repo and push.
+
+## Support the developer
+
+If you find llama.rs useful and want to support its development, you can send **Solana (SOL)** to:
+
+```
+GcdgNtdE8NEk3z9sQ5jXv2tqguZjSYqPqNAtjsjPNJx8
+```
+
+Thank you.
 
 ## License
 

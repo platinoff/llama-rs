@@ -63,3 +63,21 @@ P3: local llama.cpp (optional) → stop sequences → CLI flags → embeddings (
 ```
 
 Update this list as items are done or reprioritized.
+
+---
+
+## What to do next (in order)
+
+1. **P3.10 — Optional local llama.cpp** (only remaining item)  
+   If you need to build against a custom llama.cpp checkout: add env or config (e.g. `LLAMA_CPP_PATH`) and wire it in build or via llama-cpp-2 docs. Skip if the bundled build is enough.
+
+2. **Maintenance and polish**
+   - Bump `llama-cpp-2` when a new version is released; run tests and fix any breaking changes.
+   - Add more integration tests or examples if you add new use cases.
+   - Optionally: publish crate to crates.io (`cargo publish`), add a short CHANGELOG.
+
+3. **Possible future work**
+   - **Multi-platform CI** — add Linux/macOS to GitHub Actions.
+   - **Chat / tool-calling** — if llama-cpp-2 adds chat templates or tools, expose them in the API.
+   - **Embedding normalization** — optional mean-pool or L2 norm for `embed()` output when using embedding models.
+   - **Presets** — `ContextParams` helpers like `low_memory()` / `max_speed()` (see SIZING.md).
