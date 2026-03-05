@@ -131,3 +131,22 @@ let full = generate_stream(&model, &mut context, "Hi", &opts, |chunk| print!("{}
 ```
 
 See [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [CONCEPT.md](CONCEPT.md), [SIZING.md](SIZING.md).
+
+## Optional: embeddings feature
+
+To get a vector representation of text (for RAG, similarity, etc.):
+
+```toml
+[dependencies]
+llama_rs = { path = ".", features = ["embeddings"] }
+```
+
+```rust
+use llama_rs::{Backend, Model, Context, ModelParams, ContextParams, embed};
+
+let backend = Backend::init()?;
+let model = Model::load_from_file(&backend, Path::new("model.gguf"), &ModelParams::default())?;
+let mut context = model.new_context(&backend, ContextParams::default())?;
+let vec = embed(&model, &mut context, "Your text here")?;
+// vec.len() == model.n_vocab() (logits size)
+```

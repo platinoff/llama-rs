@@ -9,6 +9,7 @@ repository = ""
 
 [features]
 default = []
+embeddings = []
 metrics = []
 
 [lib]

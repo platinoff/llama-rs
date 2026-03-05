@@ -4,11 +4,15 @@
 
 mod backend;
 mod context;
+#[cfg(feature = "embeddings")]
+mod embed;
 mod generate;
 mod model;
 
 pub use backend::Backend;
 pub use context::{Context, GenerateOptions, GenerateOptionsBuilder};
+#[cfg(feature = "embeddings")]
+pub use embed::embed;
 pub use generate::{generate, generate_stream};
 #[cfg(feature = "metrics")]
 pub use generate::generate_with_metrics;

@@ -47,7 +47,7 @@ Prioritized roadmap after Phase 1–4. Order: **stability → API ergonomics →
 | 10 | **Optional local llama.cpp** | If needed: env or config to point at a local llama.cpp master for custom build (see Phase 2 optional in PLAN.md). |
 | 11 | ~~Stop sequences~~ Done | GenerateOptions.stop_sequences, builder .stop_sequence(s), match after each token.
 | 12 | ~~CLI flags~~ Done | clap: --max-tokens, --temperature, --seed, --no-eos, --system.
-| 13 | **Embeddings API** | If useful: expose `encode()`-based API for embedding a string (batch encode → return slice or Vec<f32>) behind a feature. |
+| 13 | ~~Embeddings API~~ Done | Feature embeddings: embed(model, context, text) -> Vec<f32>.
 
 **Outcome:** Feature-complete CLI and optional embeddings for downstream apps.
 
