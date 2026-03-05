@@ -22,6 +22,12 @@ fn generate_options_default() {
     assert!(opts.top_p > 0.0 && opts.top_p <= 1.0);
 }
 
+#[test]
+fn generate_options_builder_integration() {
+    let opts = GenerateOptions::builder().max_tokens(8).build();
+    assert_eq!(opts.max_tokens, 8);
+}
+
 /// Loads a real model and runs a short generation when `LLAMA_RS_TEST_MODEL` is set.
 /// Skip when env is unset so CI and normal `cargo test` do not require a GGUF file.
 #[test]

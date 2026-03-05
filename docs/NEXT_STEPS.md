@@ -20,9 +20,9 @@ Prioritized roadmap after Phase 1–4. Order: **stability → API ergonomics →
 
 | # | Step | Why |
 |---|------|-----|
-| 4 | **Builder for options** | `GenerateOptions::builder().max_tokens(64).temperature(0.5).build()` (or derive builder) for clearer call sites and defaults. |
+| 4 | ~~Builder for options~~ Done | GenerateOptions::builder().max_tokens(64).temperature(0.5).build().
 | 5 | **Typed params** | Re-export or wrap `LlamaModelParams` / `LlamaContextParams` with Rust-friendly defaults and docs (e.g. `ModelParams::default()`, `ContextParams::default()`) so users don’t need to touch llama-cpp-2 types for common use. |
-| 6 | **Streaming / iterator** | Expose a `generate_stream()` that yields tokens or chunks (e.g. `impl Iterator<Item = Result<TokenOrChunk>>`) so UIs can show progress without buffering the full string. |
+| 6 | ~~Streaming~~ Done | generate_stream(model, context, prompt, opts, |chunk|) yields each piece; returns full string.
 
 **Outcome:** Pleasant, self-explanatory API for embedding and CLI.
 

@@ -8,6 +8,6 @@ mod generate;
 mod model;
 
 pub use backend::Backend;
-pub use context::{Context, GenerateOptions};
-pub use generate::generate;
+pub use context::{Context, GenerateOptions, GenerateOptionsBuilder};
+pub use generate::{generate, generate_stream};
 pub use model::Model;

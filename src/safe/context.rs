@@ -65,25 +65,96 @@ pub struct GenerateOptions {
     pub stop_at_eos: bool,
 }
 
-impl Default for GenerateOptions {
-    fn default() -> Self {
-        Self {
-            max_tokens: 256,
-            temperature: 0.7,
-            top_k: 40,
-            top_p: 0.95,
-            seed: None,
-            stop_at_eos: true,
+/// Builder for [GenerateOptions]. Use [GenerateOptions::builder].
+#[derive(Clone, Debug, Default)]
+pub struct GenerateOptionsBuilder {
+    max_tokens: Option<u32>,
+    temperature: Option<f32>,
+    top_k: Option<i32>,
+    top_p: Option<f32>,
+    seed: Option<u32>,
+    stop_at_eos: Option<bool>,
+}
+
+impl GenerateOptionsBuilder {
+    /// Set max new tokens to generate.
+    #[must_use]
+    pub fn max_tokens(mut self, n: u32) -> Self {
+        self.max_tokens = Some(n);
+        self
+    }
+
+    /// Set temperature (0 = greedy, >0 for sampling).
+    #[must_use]
+    pub fn temperature(mut self, t: f32) -> Self {
+        self.temperature = Some(t);
+        self
+    }
+
+    /// Set top-k sampling (0 = disabled).
+    #[must_use]
+    pub fn top_k(mut self, k: i32) -> Self {
+        self.top_k = Some(k);
+        self
+    }
+
+    /// Set top-p (nucleus) sampling (1.0 = disabled).
+    #[must_use]
+    pub fn top_p(mut self, p: f32) -> Self {
+        self.top_p = Some(p);
+        self
+    }
+
+    /// Set random seed.
+    #[must_use]
+    pub fn seed(mut self, s: u32) -> Self {
+        self.seed = Some(s);
+        self
+    }
+
+    /// Set whether to stop at end-of-sequence token.
+    #[must_use]
+    pub fn stop_at_eos(mut self, stop: bool) -> Self {
+        self.stop_at_eos = Some(stop);
+        self
+    }
+
+    /// Build [GenerateOptions] with defaults for any unset fields.
+    #[must_use]
+    pub fn build(self) -> GenerateOptions {
+        GenerateOptions {
+            max_tokens: self.max_tokens.unwrap_or(256),
+            temperature: self.temperature.unwrap_or(0.7),
+            top_k: self.top_k.unwrap_or(40),
+            top_p: self.top_p.unwrap_or(0.95),
+            seed: self.seed,
+            stop_at_eos: self.stop_at_eos.unwrap_or(true),
         }
     }
 }
 
+impl GenerateOptions {
+    /// Create a builder with all options unset (defaults used at [GenerateOptionsBuilder::build]).
+    #[must_use]
+    pub fn builder() -> GenerateOptionsBuilder {
+        GenerateOptionsBuilder::default()
+    }
+}
+
+impl Default for GenerateOptions {
+    fn default() -> Self {
+        GenerateOptionsBuilder::default().build()
+    }
+}
+
 /// Generate text from a prompt using the given context and model. Pure Rust orchestration.
+/// If `on_chunk` is `Some`, it is called with each decoded text piece (streaming).
 pub(crate) fn generate_impl(
     model: &llama_cpp_2::model::LlamaModel,
     context: &mut Context<'_>,
     prompt: &str,
     opts: &GenerateOptions,
+    mut on_chunk: Option<&mut dyn FnMut(&str)>,
 ) -> Result<String> {
     let tokens = model
         .str_to_token(prompt, llama_cpp_2::model::AddBos::Always)
@@ -145,7 +216,12 @@ pub(crate) fn generate_impl(
     let mut decoder = encoding_rs::UTF_8.new_decoder();
     for t in &output_tokens {
         match model.token_to_piece(*t, &mut decoder, false, None) {
-            Ok(piece) => s.push_str(&piece),
+            Ok(piece) => {
+                if let Some(f) = on_chunk.as_mut() {
+                    f(&piece);
+                }
+                s.push_str(&piece);
+            }
             Err(e) => return Err(Error::TokenToString(e.to_string())),
         }
     }

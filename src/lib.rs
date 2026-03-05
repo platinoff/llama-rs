@@ -6,13 +6,20 @@
 //! - [Backend] — initialize once per process
 //! - [Model] — load GGUF from path
 //! - [Context] — decode, sample, generate
-//! - [generate] — pure Rust text generation loop with [GenerateOptions]
+//! - [generate], [generate_stream] — pure Rust text generation with [GenerateOptions]
+//! - [ModelParams], [ContextParams] — defaults for model/context config
 
 mod error;
 mod safe;
 
 pub use error::{Error, Result};
-pub use safe::{generate, Backend, Context, GenerateOptions, Model};
+pub use safe::{generate, generate_stream, Backend, Context, GenerateOptions, GenerateOptionsBuilder, Model};
+
+/// Default params for loading a model. Re-export of [llama_cpp_2::model::params::LlamaModelParams].
+pub type ModelParams = llama_cpp_2::model::params::LlamaModelParams;
+
+/// Default params for creating a context. Re-export of [llama_cpp_2::context::params::LlamaContextParams].
+pub type ContextParams = llama_cpp_2::context::params::LlamaContextParams;
 
 /// Returns the greeting string for the first run.
 #[must_use]
@@ -74,5 +81,31 @@ mod tests {
         let opts2 = opts.clone();
         assert_eq!(opts.max_tokens, opts2.max_tokens);
         assert_eq!(opts.temperature, opts2.temperature);
+    }
+
+    #[test]
+    fn generate_options_builder() {
+        let opts = GenerateOptions::builder()
+            .max_tokens(64)
+            .temperature(0.5)
+            .top_k(10)
+            .top_p(0.9)
+            .seed(42)
+            .stop_at_eos(false)
+            .build();
+        assert_eq!(opts.max_tokens, 64);
+        assert!((opts.temperature - 0.5).abs() < 1e-6);
+        assert_eq!(opts.top_k, 10);
+        assert!((opts.top_p - 0.9).abs() < 1e-6);
+        assert_eq!(opts.seed, Some(42));
+        assert!(!opts.stop_at_eos);
+    }
+
+    #[test]
+    fn generate_options_builder_defaults() {
+        let opts = GenerateOptions::builder().build();
+        assert!(opts.max_tokens > 0);
+        assert!(opts.temperature >= 0.0);
+        assert!(opts.top_p > 0.0 && opts.top_p <= 1.0);
     }
 }

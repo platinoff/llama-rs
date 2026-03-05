@@ -11,10 +11,11 @@ Llama-RS is built as a **Rust-first** layer on top of the llama.cpp C API. The a
 │  CLI / Application (main.rs, safe Rust)                 │
 ├─────────────────────────────────────────────────────────┤
 │  Public API (lib.rs, safe Rust)                          │
-│  - Model loading, context, sampling, batching            │
+│  - Model loading, context, sampling, generate, stream    │
 ├─────────────────────────────────────────────────────────┤
 │  Safe wrappers (src/safe/)                              │
-│  - Backend, Model, Context, GenerateOptions, generate   │
+│  - Backend, Model, Context, GenerateOptions, generate,  │
+│    generate_stream, ModelParams, ContextParams        │
 ├─────────────────────────────────────────────────────────┤
 │  llama-cpp-2 crate (FFI to llama.cpp)                  │
 ├─────────────────────────────────────────────────────────┤
@@ -26,9 +27,9 @@ Llama-RS is built as a **Rust-first** layer on top of the llama.cpp C API. The a
 
 | Module    | Purpose |
 |-----------|---------|
-| `lib.rs`  | Public API (safe Rust): Backend, Model, Context, generate, Error, Result. |
+| `lib.rs`  | Public API: Backend, Model, Context, ModelParams, ContextParams, GenerateOptions, generate, generate_stream, Error, Result. |
 | `error.rs`| Unified Error and Result; conversions from llama-cpp-2 errors. |
-| `safe/`   | Safe wrappers: Backend, Model, Context, GenerateOptions, generate (pure Rust loop). |
+| `safe/`   | Safe wrappers: Backend, Model, Context, GenerateOptions + builder, generate, generate_stream (pure Rust loop). |
 
 FFI is confined to the **llama-cpp-2** dependency; no unsafe code in this repository.
 
@@ -36,7 +37,7 @@ FFI is confined to the **llama-cpp-2** dependency; no unsafe code in this reposi
 
 1. **Model load** — GGUF path → `Model::load_from_file(backend, path, params)` → safe `Model`.
 2. **Context** — `model.new_context(backend, ctx_params)` → safe `Context`.
-3. **Generate** — `generate(&model, &mut context, prompt, &opts)` runs in Rust: tokenize → batch decode → sampler → accept token → repeat until EOS or max_tokens.
+3. **Generate** — `generate(&model, &mut context, prompt, &opts)` or `generate_stream(..., |chunk| { ... })`; both run in Rust: tokenize → batch decode → sampler → accept token → repeat until EOS or max_tokens.
 4. **Sampling** — LlamaSampler (temp, top_k, top_p, dist) applied in Rust; single token decoded per step via llama-cpp-2.
 
 ## Build dependencies

@@ -108,15 +108,20 @@ See [BENCHMARKS.md](BENCHMARKS.md) for speed benchmarks and inference metrics.
 ## API usage example
 
 ```rust
-use llama_rs::{Backend, Model, Context, GenerateOptions, generate};
-use llama_cpp_2::model::params::LlamaModelParams;
-use llama_cpp_2::context::params::LlamaContextParams;
+use llama_rs::{Backend, Model, Context, GenerateOptions, ModelParams, ContextParams, generate, generate_stream};
 use std::path::Path;
 
 let backend = Backend::init()?;
-let model = Model::load_from_file(&backend, Path::new("model.gguf"), &LlamaModelParams::default())?;
-let mut context = model.new_context(&backend, LlamaContextParams::default())?;
-let out = generate(&model, &mut context, "Hello", &GenerateOptions::default())?;
+let model = Model::load_from_file(&backend, Path::new("model.gguf"), &ModelParams::default())?;
+let mut context = model.new_context(&backend, ContextParams::default())?;
+
+// One-shot generation with builder
+let opts = GenerateOptions::builder().max_tokens(64).temperature(0.7).build();
+let out = generate(&model, &mut context, "Hello", &opts)?;
+
+// Streaming: callback per decoded piece
+let opts = GenerateOptions::builder().max_tokens(32).build();
+let full = generate_stream(&model, &mut context, "Hi", &opts, |chunk| print!("{}", chunk))?;
 ```
 
 Architecture and plan documentation: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [CONCEPT.md](CONCEPT.md).
