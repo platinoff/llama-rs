@@ -112,4 +112,21 @@ mod tests {
         assert!(opts.temperature >= 0.0);
         assert!(opts.top_p > 0.0 && opts.top_p <= 1.0);
     }
+
+    #[test]
+    fn generate_options_stop_sequences() {
+        let opts = GenerateOptions::builder()
+            .stop_sequence("\n\n")
+            .stop_sequence("Human:")
+            .build();
+        assert_eq!(opts.stop_sequences.len(), 2);
+        assert_eq!(opts.stop_sequences[0], "\n\n");
+        assert_eq!(opts.stop_sequences[1], "Human:");
+    }
+
+    #[test]
+    fn generate_options_default_has_empty_stop_sequences() {
+        let opts = GenerateOptions::default();
+        assert!(opts.stop_sequences.is_empty());
+    }
 }

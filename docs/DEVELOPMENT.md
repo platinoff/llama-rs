@@ -119,6 +119,12 @@ let mut context = model.new_context(&backend, ContextParams::default())?;
 let opts = GenerateOptions::builder().max_tokens(64).temperature(0.7).build();
 let out = generate(&model, &mut context, "Hello", &opts)?;
 
+// Stop when output ends with any of these strings
+let opts = GenerateOptions::builder()
+    .stop_sequence("\n\n")
+    .stop_sequence("Human:")
+    .build();
+
 // Streaming: callback per decoded piece
 let opts = GenerateOptions::builder().max_tokens(32).build();
 let full = generate_stream(&model, &mut context, "Hi", &opts, |chunk| print!("{}", chunk))?;

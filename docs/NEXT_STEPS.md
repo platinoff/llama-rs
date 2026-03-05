@@ -45,8 +45,8 @@ Prioritized roadmap after Phase 1–4. Order: **stability → API ergonomics →
 | # | Step | Why |
 |---|------|-----|
 | 10 | **Optional local llama.cpp** | If needed: env or config to point at a local llama.cpp master for custom build (see Phase 2 optional in PLAN.md). |
-| 11 | **Stop sequences** | Support stop strings (e.g. `["\n\n", "Human:"]`) in `GenerateOptions` and stop generation when any match is found. |
-| 12 | **CLI flags** | Extend CLI: `--max-tokens`, `--temperature`, `--seed`, `--no-eos` (stop_at_eos), optional `--system` prompt. |
+| 11 | ~~Stop sequences~~ Done | GenerateOptions.stop_sequences, builder .stop_sequence(s), match after each token.
+| 12 | ~~CLI flags~~ Done | clap: --max-tokens, --temperature, --seed, --no-eos, --system.
 | 13 | **Embeddings API** | If useful: expose `encode()`-based API for embedding a string (batch encode → return slice or Vec<f32>) behind a feature. |
 
 **Outcome:** Feature-complete CLI and optional embeddings for downstream apps.

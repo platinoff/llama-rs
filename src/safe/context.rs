@@ -65,6 +65,8 @@ pub struct GenerateOptions {
     pub seed: Option<u32>,
     /// Stop at end-of-sequence token.
     pub stop_at_eos: bool,
+    /// Stop generation when the output ends with any of these strings (matched after each token).
+    pub stop_sequences: Vec<String>,
 }
 
 /// Builder for [GenerateOptions]. Use [GenerateOptions::builder].
@@ -76,6 +78,7 @@ pub struct GenerateOptionsBuilder {
     top_p: Option<f32>,
     seed: Option<u32>,
     stop_at_eos: Option<bool>,
+    stop_sequences: Option<Vec<String>>,
 }
 
 impl GenerateOptionsBuilder {
@@ -121,6 +124,22 @@ impl GenerateOptionsBuilder {
         self
     }
 
+    /// Set stop sequences: generation stops when output ends with any of these (matched after each token).
+    #[must_use]
+    pub fn stop_sequences(mut self, seq: Vec<String>) -> Self {
+        self.stop_sequences = Some(seq);
+        self
+    }
+
+    /// Add a single stop sequence.
+    #[must_use]
+    pub fn stop_sequence(mut self, s: impl Into<String>) -> Self {
+        let mut v = self.stop_sequences.unwrap_or_default();
+        v.push(s.into());
+        self.stop_sequences = Some(v);
+        self
+    }
+
     /// Build [GenerateOptions] with defaults for any unset fields.
     #[must_use]
     pub fn build(self) -> GenerateOptions {
@@ -131,6 +150,7 @@ impl GenerateOptionsBuilder {
             top_p: self.top_p.unwrap_or(0.95),
             seed: self.seed,
             stop_at_eos: self.stop_at_eos.unwrap_or(true),
+            stop_sequences: self.stop_sequences.unwrap_or_default(),
         }
     }
 }
@@ -196,6 +216,8 @@ pub(crate) fn generate_impl(
     ]);
 
     let mut output_tokens: Vec<LlamaToken> = Vec::with_capacity(opts.max_tokens as usize);
+    let mut running_output = String::new();
+    let mut decoder = encoding_rs::UTF_8.new_decoder();
     let mut n_cur = tokens.len() as i32;
     let mut n_gen = 0u32;
 
@@ -212,6 +234,28 @@ pub(crate) fn generate_impl(
         output_tokens.push(token);
         n_gen += 1;
 
+        let piece = match model.token_to_piece(token, &mut decoder, false, None) {
+            Ok(p) => p,
+            Err(e) => return Err(Error::TokenToString(e.to_string())),
+        };
+        running_output.push_str(&piece);
+        if let Some(f) = on_chunk.as_mut() {
+            f(&piece);
+        }
+
+        let mut stop_hit = false;
+        for stop in &opts.stop_sequences {
+            if !stop.is_empty() && running_output.ends_with(stop) {
+                let trim = running_output.len().saturating_sub(stop.len());
+                running_output.truncate(trim);
+                stop_hit = true;
+                break;
+            }
+        }
+        if stop_hit {
+            break;
+        }
+
         batch.clear();
         batch
             .add(token, n_cur, &[seq_id], true)
@@ -223,22 +267,9 @@ pub(crate) fn generate_impl(
         }
     }
 
-    let mut s = String::new();
-    let mut decoder = encoding_rs::UTF_8.new_decoder();
-    for t in &output_tokens {
-        match model.token_to_piece(*t, &mut decoder, false, None) {
-            Ok(piece) => {
-                if let Some(f) = on_chunk.as_mut() {
-                    f(&piece);
-                }
-                s.push_str(&piece);
-            }
-            Err(e) => return Err(Error::TokenToString(e.to_string())),
-        }
-    }
     if let Some(m) = metrics.as_mut() {
         m.tokens_generated = output_tokens.len() as u32;
         m.wall_time_ms = start.elapsed().as_millis() as u64;
     }
-    Ok(s)
+    Ok(running_output)
 }

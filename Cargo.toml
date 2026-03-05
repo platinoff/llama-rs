@@ -20,6 +20,7 @@ name = "llama_rs"
 path = "src/main.rs"
 
 [dependencies]
+clap = { version = "4.3", features = ["derive"] }
 encoding_rs = "0.8"
 llama-cpp-2 = { version = "0.1", features = ["sampler"] }
 thiserror = "2.0"
