@@ -6,7 +6,6 @@ use encoding_rs;
 use llama_cpp_2::context::LlamaContext;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::sampling::LlamaSampler;
-use llama_cpp_2::token::LlamaToken;
 use std::time::Instant;
 
 /// Inference context tied to a [crate::Model]. All inference is done through the context.
@@ -215,11 +214,12 @@ pub(crate) fn generate_impl(
         LlamaSampler::dist(opts.seed.unwrap_or(0xFFFF_FFFF)),
     ]);
 
-    let mut output_tokens: Vec<LlamaToken> = Vec::with_capacity(opts.max_tokens as usize);
     let mut running_output = String::new();
+    running_output.reserve((opts.max_tokens as usize).saturating_mul(4)); // ~4 chars per token heuristic
     let mut decoder = encoding_rs::UTF_8.new_decoder();
     let mut n_cur = tokens.len() as i32;
     let mut n_gen = 0u32;
+    let stop_sequences_empty = opts.stop_sequences.is_empty();
 
     while n_gen < opts.max_tokens && n_cur < n_ctx {
         let mut arr = context.inner.token_data_array();
@@ -231,7 +231,6 @@ pub(crate) fn generate_impl(
             break;
         }
 
-        output_tokens.push(token);
         n_gen += 1;
 
         let piece = match model.token_to_piece(token, &mut decoder, false, None) {
@@ -244,12 +243,14 @@ pub(crate) fn generate_impl(
         }
 
         let mut stop_hit = false;
-        for stop in &opts.stop_sequences {
-            if !stop.is_empty() && running_output.ends_with(stop) {
-                let trim = running_output.len().saturating_sub(stop.len());
-                running_output.truncate(trim);
-                stop_hit = true;
-                break;
+        if !stop_sequences_empty {
+            for stop in &opts.stop_sequences {
+                if !stop.is_empty() && running_output.ends_with(stop) {
+                    let trim = running_output.len().saturating_sub(stop.len());
+                    running_output.truncate(trim);
+                    stop_hit = true;
+                    break;
+                }
             }
         }
         if stop_hit {
@@ -268,7 +269,7 @@ pub(crate) fn generate_impl(
     }
 
     if let Some(m) = metrics.as_mut() {
-        m.tokens_generated = output_tokens.len() as u32;
+        m.tokens_generated = n_gen;
         m.wall_time_ms = start.elapsed().as_millis() as u64;
     }
     Ok(running_output)
