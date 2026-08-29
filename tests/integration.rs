@@ -37,7 +37,10 @@ fn generate_with_model_if_env_set() {
         _ => return,
     };
     if !path.exists() {
-        eprintln!("LLAMA_RS_TEST_MODEL path does not exist: {}", path.display());
+        eprintln!(
+            "LLAMA_RS_TEST_MODEL path does not exist: {}",
+            path.display()
+        );
         return;
     }
 
@@ -45,7 +48,9 @@ fn generate_with_model_if_env_set() {
     let params = llama_cpp_2::model::params::LlamaModelParams::default();
     let model = llama_rs::Model::load_from_file(&backend, &path, &params).expect("load model");
     let ctx_params = llama_cpp_2::context::params::LlamaContextParams::default();
-    let mut context = model.new_context(&backend, ctx_params).expect("new context");
+    let mut context = model
+        .new_context(&backend, ctx_params)
+        .expect("new context");
     let mut opts = GenerateOptions::default();
     opts.max_tokens = 4;
     opts.stop_at_eos = true;

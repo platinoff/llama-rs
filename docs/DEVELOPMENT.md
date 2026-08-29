@@ -10,6 +10,7 @@ Step-by-step guide for Rust developers: build, test, benchmarks, git.
   rustup default stable-x86_64-pc-windows-msvc
   ```
   Building the MSVC target requires **Build Tools for Visual Studio** with the **"Desktop development with C++"** workload (provides `link.exe`).
+- **CMake**: the bundled llama.cpp is built via **CMake** (`llama-cpp-sys` build script). Install CMake ([download](https://cmake.org/download/) or `winget install Kitware.CMake`) and ensure `cmake` is on your `PATH` (restart the terminal after install).
 - **Clang / libclang**: the `llama-cpp-2` dependency uses **bindgen** at build time and needs **libclang**. Either:
   - **Option A:** In Visual Studio Installer → Modify your Build Tools → **Individual components** → search **"Clang"** and install **"C++ Clang tools for Windows"** (or **"C++ Clang compiler for Windows"**), then ensure the Clang `bin` (containing `libclang.dll`) is on `PATH` or set `LIBCLANG_PATH` to that `bin` folder.
   - **Option B:** Install [LLVM](https://releases.llvm.org/) (Windows installer) and set `LIBCLANG_PATH` to the LLVM `bin` directory (e.g. `C:\Program Files\LLVM\bin`).

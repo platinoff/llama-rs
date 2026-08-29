@@ -25,7 +25,14 @@ pub fn generate_stream<F>(
 where
     F: FnMut(&str),
 {
-    super::context::generate_impl(&model.inner, context, prompt, opts, Some(&mut on_chunk), None)
+    super::context::generate_impl(
+        &model.inner,
+        context,
+        prompt,
+        opts,
+        Some(&mut on_chunk),
+        None,
+    )
 }
 
 /// Generate text and collect metrics (tokens generated, decode count, wall time). Requires feature `metrics`.

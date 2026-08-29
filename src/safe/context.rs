@@ -16,12 +16,16 @@ pub struct Context<'a> {
 impl<'a> Context<'a> {
     /// Decode a batch of tokens. Call [Self::candidates] or [Self::get_logits] after decode.
     pub fn decode(&mut self, batch: &mut LlamaBatch<'_>) -> Result<()> {
-        self.inner.decode(batch).map_err(|e| Error::Decode(e.to_string()))
+        self.inner
+            .decode(batch)
+            .map_err(|e| Error::Decode(e.to_string()))
     }
 
     /// Encode a batch (e.g. for embeddings).
     pub fn encode(&mut self, batch: &mut LlamaBatch<'_>) -> Result<()> {
-        self.inner.encode(batch).map_err(|e| Error::ContextCreate(e.to_string()))
+        self.inner
+            .encode(batch)
+            .map_err(|e| Error::ContextCreate(e.to_string()))
     }
 
     /// Logits for the last decoded token (slice of size n_vocab).
@@ -32,7 +36,9 @@ impl<'a> Context<'a> {
 
     /// Iterator over token candidates (logits) for the last token.
     #[inline]
-    pub fn candidates(&self) -> impl Iterator<Item = llama_cpp_2::token::data::LlamaTokenData> + '_ {
+    pub fn candidates(
+        &self,
+    ) -> impl Iterator<Item = llama_cpp_2::token::data::LlamaTokenData> + '_ {
         self.inner.candidates()
     }
 

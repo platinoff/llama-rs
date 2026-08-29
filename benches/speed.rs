@@ -72,25 +72,24 @@ fn bench_time_to_first_token(c: &mut Criterion) {
             let first = std::sync::atomic::AtomicBool::new(true);
             let ttf = std::sync::atomic::AtomicU64::new(0);
             let start = std::time::Instant::now();
-            let _ = llama_rs::generate_stream(
-                &model,
-                &mut context,
-                "Hi",
-                &opts,
-                |_| {
-                    if first.swap(false, std::sync::atomic::Ordering::Relaxed) {
-                        ttf.store(
-                            start.elapsed().as_millis() as u64,
-                            std::sync::atomic::Ordering::Relaxed,
-                        );
-                    }
-                },
-            )
+            let _ = llama_rs::generate_stream(&model, &mut context, "Hi", &opts, |_| {
+                if first.swap(false, std::sync::atomic::Ordering::Relaxed) {
+                    ttf.store(
+                        start.elapsed().as_millis() as u64,
+                        std::sync::atomic::Ordering::Relaxed,
+                    );
+                }
+            })
             .expect("generate_stream");
             black_box(ttf.load(std::sync::atomic::Ordering::Relaxed))
         });
     });
 }
 
-criterion_group!(benches, bench_hello, bench_inference_tokens_per_sec, bench_time_to_first_token);
+criterion_group!(
+    benches,
+    bench_hello,
+    bench_inference_tokens_per_sec,
+    bench_time_to_first_token
+);
 criterion_main!(benches);

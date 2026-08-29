@@ -24,8 +24,11 @@ cd llama-rs
 
 - **Rust** — [rustup](https://rustup.rs), then e.g. `rustup default stable-x86_64-pc-windows-msvc` for 64-bit Windows. Required to compile llama.rs and run the build via `cargo`.
 - **Visual Studio Build Tools** — install the **"Desktop development with C++"** workload: provides `link.exe` and the MSVC environment; without it Rust cannot build the Windows binary.
-- **Clang** — in VS Installer, add **"C++ Clang tools for Windows"**. The `llama-cpp-2` crate uses `libclang.dll` to parse C/C++ headers; without this the build will fail with an error about `LIBCLANG_PATH`.  
-  Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#prerequisites).
+- **CMake** — `llama-cpp-sys` invokes **CMake** to build llama.cpp. Install [CMake](https://cmake.org/download/) or run `winget install Kitware.CMake`, then restart the terminal so `cmake` is on `PATH`. Without it you get `program not found` / `is 'cmake' not installed?`.
+- **Clang / libclang** — the `llama-cpp-2` crate uses **bindgen** and needs `libclang.dll`. Either:
+  - Install **LLVM for Windows**: `winget install LLVM.LLVM`, then set `LIBCLANG_PATH` to `C:\Program Files\LLVM\bin`, or
+  - In VS Installer, add **"C++ Clang tools for Windows"** and point `LIBCLANG_PATH` at `...\VC\Tools\Llvm\x64\bin` under your VS/Build Tools install.  
+  Without this, the build fails with `Unable to find libclang`. Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#prerequisites).
 
 **3. Build**
 
