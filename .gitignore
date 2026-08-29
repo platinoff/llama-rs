@@ -13,6 +13,7 @@ Cargo.lock
 
 # Build artifacts from llama.cpp (if built in-tree)
 /build/
+llama.cpp-master/
 llama.cpp-master/build/
 *.dll
 *.lib
