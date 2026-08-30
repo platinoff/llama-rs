@@ -99,6 +99,7 @@ See **[NEXT_STEPS.md](NEXT_STEPS.md)** for the Rust-architect roadmap: P0 stabil
 
 - **OS:** Windows (per paths like S:\rust\...).
 - **Target:** `x86_64-pc-windows-msvc` for a 64-bit `.exe`.
+- **Model:** `models/Qwen3.8-27B-UD-IQ2_XXS.gguf` (from `L:\qwen4lama_rs\Qwen3.8-27B-UD-IQ2_XXS.gguf`).
 
 Verification:
 

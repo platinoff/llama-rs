@@ -1,0 +1,2 @@
+[env]
+LIBCLANG_PATH = { value = "S:\\rust\\llama-rs\\.llvm", force = true }

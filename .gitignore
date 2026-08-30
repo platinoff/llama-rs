@@ -20,6 +20,12 @@ llama.cpp-master/build/
 *.a
 *.pdb
 
+# Local artifacts
+build.log
+build.pid
+/models/
+/.llvm/
+
 # Env and secrets
 .env
 .env.local
