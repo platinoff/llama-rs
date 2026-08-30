@@ -23,6 +23,7 @@ llama.cpp-master/build/
 # Local artifacts
 build.log
 build.pid
+test.log
 /models/
 /.llvm/
 

@@ -2,7 +2,6 @@
 
 use crate::error::{Error, Result};
 use crate::InferenceMetrics;
-use encoding_rs;
 use llama_cpp_2::context::LlamaContext;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::sampling::LlamaSampler;

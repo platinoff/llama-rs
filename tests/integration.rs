@@ -51,9 +51,11 @@ fn generate_with_model_if_env_set() {
     let mut context = model
         .new_context(&backend, ctx_params)
         .expect("new context");
-    let mut opts = GenerateOptions::default();
-    opts.max_tokens = 4;
-    opts.stop_at_eos = true;
+    let opts = GenerateOptions {
+        max_tokens: 4,
+        stop_at_eos: true,
+        ..Default::default()
+    };
 
     let out = llama_rs::generate(&model, &mut context, "Hi", &opts).expect("generate");
     assert!(out.len() <= 256, "short run should not produce huge output");

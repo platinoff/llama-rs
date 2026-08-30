@@ -1,2 +1,5 @@
 [env]
 LIBCLANG_PATH = { value = "S:\\rust\\llama-rs\\.llvm", force = true }
+BINDGEN_EXTRA_CLANG_ARGS = { value = "-isystem S:/rust/llama-rs/.llvm/lib/clang/18/include -isystem C:/msys64/mingw64/include", force = true }
+CMAKE_C_FLAGS_RELEASE = { value = "-D_WIN32_WINNT=0x0A00", force = true }
+CMAKE_CXX_FLAGS_RELEASE = { value = "-D_WIN32_WINNT=0x0A00", force = true }
