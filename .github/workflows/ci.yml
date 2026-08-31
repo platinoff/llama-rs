@@ -36,10 +36,16 @@ jobs:
             echo "LIBCLANG_PATH=$dir" >> $env:GITHUB_ENV
           }
 
-      - name: Set up Rust (MSVC)
+      - name: Set up Rust (GNU)
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc
+          toolchain: stable-x86_64-pc-windows-gnu
+          targets: x86_64-pc-windows-gnu
+
+      - name: Install CMake 3.31
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.31.9"
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -48,18 +54,23 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-gnu-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-gnu-cargo-
 
-      - name: Check
-        run: cargo check --all-targets
+      - name: Check (xtask)
+        run: cargo xtask check
+        env:
+          LIBCLANG_PATH: ${{ env.LIBCLANG_PATH }}
+          CMAKE: ${{ env.CMAKE }}
 
-      - name: Test
-        run: cargo test
+      - name: Loc audit (ratio ≥96%)
+        run: cargo xtask loc
 
       - name: Build release
         run: cargo build --release
+        env:
+          LIBCLANG_PATH: ${{ env.LIBCLANG_PATH }}
 
       - name: Run release binary
-        run: .\target\release\llama_rs.exe
+        run: .\target\release\llama_rs.exe --help
