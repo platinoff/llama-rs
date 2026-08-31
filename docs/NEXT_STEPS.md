@@ -1,85 +1,72 @@
 # Next Steps — Development Priorities (Rust Architect View)
 
-**Principles:** This repo is **100% Rust** and **ultra-fast**. We do **not** build from a local llama.cpp; the backend is the one provided by the `llama-cpp-2` dependency.
+**Principles:** **100% Rust**, **ultra-fast**, **GSV-live compatible**. No smaller GGUF — we run 27B via mmap on 5500U; focus is staged RAM control + ratio/speed. No Python/Java, shell → `cargo xtask` where logical. Backend is `llama-cpp-2` only (vendored `llama-cpp-sys-2 0.1.154`).
 
-Prioritized roadmap after Phase 1–4. Order: **stability → API ergonomics → performance → features**.
+Prioritized roadmap after Phase 1–4: **P0 staged loading → P1 rustification/GSV → P2 ratio/speed** (smaller model skipped).
 
 ---
 
-## P0 — Stability and correctness
+## P0 — Staged model loading (disk → RAM ступенями) — NEW
 
 | # | Step | Why |
 |---|------|-----|
-| 1 | **Eliminate deprecation** | Replace `token_to_str` with proper use of `token_to_piece` (decoder + options) so upgrades of `llama-cpp-2` don’t break. |
-| 2 | **Error context** | Add path to `ModelLoad` when converting from `LlamaModelLoadError` (if the upstream error carries it), and consider `.source()` / `#[cause]` for chaining. |
-| 3 | **CI** | GitHub Actions: cargo check, test, build --release on Windows (MSVC + LIBCLANG_PATH).
+| 1 | **StagedLoad API** | `src/safe/staged.rs` + `Model::load_staged(backend, path, StagedLoadOptions { use_mmap, use_mlock, on_progress })` — wraps `LlamaModelParams::with_progress_callback` (0.0..1.0, abort). Pure Rust orchestration. Stages: `Mmap` (file on disk, paged), `Mlock` (pin), `NoAlloc` (defer). Benchmark vs RAM in `SIZING.md`. |
+| 2 | **Progress + abort** | Callback `FnMut(f32) -> bool` reports per-stage; `false` aborts load. CLI `--progress` prints; optional GSV live push. |
+| 3 | **Tests** | Unit: default options, progress callback round-trip; Integration: `LLAMA_RS_TEST_MODEL` with staged vs mmap. |
 
-**Outcome:** Solid base, no known tech debt, green CI.
+**Outcome:** Controlled RAM use without smaller model; 27B stays mmap, optional mlock/prefault.
 
 ---
 
-## P1 — API ergonomics and clarity
+## P1 — Rustification & GSV live (pure Rust, no smaller model)
 
 | # | Step | Why |
 |---|------|-----|
-| 4 | ~~Builder for options~~ Done | GenerateOptions::builder().max_tokens(64).temperature(0.5).build().
-| 5 | ~~Typed params~~ Done | ModelParams, ContextParams re-exported in lib. Re-export or wrap `LlamaModelParams` / `LlamaContextParams` with Rust-friendly defaults and docs (e.g. `ModelParams::default()`, `ContextParams::default()`) so users don’t need to touch llama-cpp-2 types for common use. |
-| 6 | ~~Streaming~~ Done | generate_stream(model, context, prompt, opts, |chunk|) yields each piece; returns full string.
+| 4 | **Ratio ≥96%** | `gsv-loc-audit --stretch-96` currently 99.46%; keep. Replace shell/YAML with `cargo xtask` (Rust) where logical; no Python/Java. Already 100% Rust crate (no `build.rs`). |
+| 5 | **GSV live compat** | `PRODUCTS.md` lists `llama-rs`; `abrakadabra` drain works. Optional `GSV_LIVE=1` reports staged progress to `http://127.0.0.1:9999` (thin Rust glue, no extra daemon). |
+| 6 | **Speed** | Keep `cargo bench --bench speed` for `time_to_first_token` / `tokens_per_sec`; zero-copy paths. |
 
-**Outcome:** Pleasant, self-explanatory API for embedding and CLI.
-
----
-
-## P2 — Performance and observability
-
-| # | Step | Why |
-|---|------|-----|
-| 7 | ~~Benchmark time-to-first-token~~ Done | bench time_to_first_token when LLAMA_RS_BENCH_MODEL set.
-| 8 | ~~Structured metrics~~ Done | Feature metrics: InferenceMetrics, generate_with_metrics.
-| 9 | ~~Batch size and context~~ Done | docs/SIZING.md. Document (and optionally validate) `n_batch` / `n_ctx` vs. memory and throughput; consider helpers or presets (e.g. “low memory”, “max speed”). |
-
-**Outcome:** Measurable, tunable performance and clear docs for sizing.
+**Outcome:** Pure-Rust, GSV-compatible, ultra-speed.
 
 ---
 
-## P3 — Features and polish
+## P2 — Prior done (reference)
 
-| # | Step | Why |
-|---|------|-----|
-| 10 | ~~Optional local llama.cpp~~ Skipped | We keep 100% Rust (no local C++ build); backend from crate only. |
-| 11 | ~~Stop sequences~~ Done | GenerateOptions.stop_sequences, builder .stop_sequence(s), match after each token.
-| 12 | ~~CLI flags~~ Done | clap: --max-tokens, --temperature, --seed, --no-eos, --system.
-| 13 | ~~Embeddings API~~ Done | Feature embeddings: embed(model, context, text) -> Vec<f32>.
+| # | Step | Status |
+|---|------|--------|
+| 7 | ~~Builder, Typed params, Streaming~~ | Done |
+| 8 | ~~TTF bench, Metrics, SIZING~~ | Done |
+| 9 | ~~Stop sequences, CLI flags, Embeddings~~ | Done |
+| 10 | ~~No local llama.cpp (skipped) / deprecation fix~~ | Done/Skipped |
 
-**Outcome:** Feature-complete CLI and optional embeddings for downstream apps.
+**Outcome:** Feature-complete CLI + embeddings; stable base.
 
 ---
 
-## Summary order
+## Summary order (new)
 
 ```
-P0: deprecation fix → error context → CI
-P1: GenerateOptions builder → typed params → generate_stream
-P2: time-to-first-token bench → metrics feature → n_batch/n_ctx docs
-P3: stop sequences → CLI flags → embeddings (no local llama.cpp)
+P0: StagedLoad API → progress+abort → tests (disk→RAM stages)
+P1: Ratio ≥96% → GSV live compat → speed benches
+P2: (prior) builders, streaming, TTF, metrics, SIZING — Done
 ```
 
-Update this list as items are done or reprioritized.
+Smaller model / GPU bench removed — we stay 27B mmap with staged RAM control.
 
 ---
 
-## What to do next (100% Rust, ultra-fast)
+## What to do next (100% Rust, ultra-fast, GSV-live)
 
 1. **Maintenance**
-   - Bump `llama-cpp-2` when a new version is released; run tests and fix any breaking changes.
-   - Keep CI green (Windows); add Linux/macOS jobs if you need multi-platform.
+    - Bump `llama-cpp-2`/`llama-cpp-sys-2` (now 0.1.154); keep 4 Windows-GNU `build.rs` patches in registry.
+    - Keep CI green (Windows GNU, `LIBCLANG_PATH` + `CMAKE` pin, `stable-x86_64-pc-windows-gnu`), `cargo fmt/clippy/test` + `gsv-loc-audit --stretch-96`.
 
-2. **Polish**
-   - Add integration tests or examples for new use cases.
-   - Optionally: publish to crates.io (`cargo publish`), add a short CHANGELOG.
+2. **Staged loading follow-ups**
+    - `SIZING.md` table: `mmap` vs `mlock` vs `no_alloc` vs RAM.
+    - `BENCHMARKS.md` staged timings (current: mmap 0.031 tok/s, 248s TTF on 5500U).
+    - Optional: `load_staged` → GSV vision push (`GSV_LIVE` env).
 
-3. **Optional improvements (still 100% Rust, ultra-fast)**
-   - **Presets** — `ContextParams` helpers like `low_memory()` / `max_speed()` (see SIZING.md).
-   - **Chat / tool-calling** — if llama-cpp-2 adds chat templates or tools, expose them in the API.
-   - **Embedding normalization** — optional mean-pool or L2 norm for `embed()` when using embedding models.
+3. **Polish (still 100% Rust)**
+    - `ContextParams` presets `low_memory()` / `max_speed()`; chat/tool templates if upstream adds them; embedding norm.
+    - Publish to crates.io if desired; keep `abrakadabra` ticket flow (one commit per drain).
 

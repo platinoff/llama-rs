@@ -8,12 +8,12 @@
 //!   llama_rs --help               — show all options
 
 use clap::Parser;
-use llama_rs::{Backend, ContextParams, GenerateOptions, Model, ModelParams};
+use llama_rs::{Backend, ContextParams, GenerateOptions, Model, StagedLoadOptions};
 use std::path::Path;
 
 #[derive(Parser, Debug)]
 #[command(name = "llama_rs")]
-#[command(about = "llama.rs — Llama in Rust (backend: llama.cpp)")]
+#[command(about = "llama.rs — Llama in Rust (backend: llama.cpp, staged disk→RAM)")]
 struct Args {
     /// Path to the GGUF model file.
     #[arg(index = 1)]
@@ -42,6 +42,22 @@ struct Args {
     /// System or prefix prompt (prepended to the main prompt with a newline).
     #[arg(long)]
     system: Option<String>,
+
+    /// Use mmap for model load (default true; low-RAM, paged). Use --no-mmap to fully resident.
+    #[arg(long, default_value_t = true)]
+    mmap: bool,
+
+    /// Disable mmap (fully read into RAM, needs ~8 GiB for 27B).
+    #[arg(long, default_value_t = false)]
+    no_mmap: bool,
+
+    /// Pin model pages with mlock (needs privilege + RAM, default false).
+    #[arg(long, default_value_t = false)]
+    mlock: bool,
+
+    /// Show staged load progress (0..100%).
+    #[arg(long, default_value_t = false)]
+    progress: bool,
 }
 
 fn main() {
@@ -66,12 +82,38 @@ fn main() {
         }
     };
 
-    let model_params = ModelParams::default();
-    let model = match Model::load_from_file(&backend, path, &model_params) {
-        Ok(m) => m,
-        Err(e) => {
-            eprintln!("error: failed to load model: {}", e);
-            std::process::exit(1);
+    let use_mmap = if args.no_mmap { false } else { args.mmap };
+    let staged = StagedLoadOptions::new()
+        .with_mmap(use_mmap)
+        .with_mlock(args.mlock);
+    // Staged loading with optional progress (pure Rust, controls disk→RAM).
+    let model = if args.progress {
+        let mut last_pct = 0u32;
+        match Model::load_staged_with_progress(&backend, path, staged, &mut |p: f32| {
+            let pct = (p * 100.0) as u32;
+            if pct != last_pct && pct.is_multiple_of(5) {
+                eprintln!("loading {}% (mmap={}, mlock={})", pct, use_mmap, args.mlock);
+                // Optional GSV live push: if GSV_LIVE=1, could POST to 127.0.0.1:9999 (thin, no dep)
+                if std::env::var("GSV_LIVE").is_ok() {
+                    // best-effort, ignore errors
+                }
+                last_pct = pct;
+            }
+            true
+        }) {
+            Ok(m) => m,
+            Err(e) => {
+                eprintln!("error: failed to load model (staged): {}", e);
+                std::process::exit(1);
+            }
+        }
+    } else {
+        match Model::load_staged(&backend, path, staged, None::<fn(f32) -> bool>) {
+            Ok(m) => m,
+            Err(e) => {
+                eprintln!("error: failed to load model (staged): {}", e);
+                std::process::exit(1);
+            }
         }
     };
 

@@ -79,27 +79,41 @@ llama-rs-project/
 - [x] `benches/` — speed benchmark (hello); inference metrics documented in `docs/BENCHMARKS.md`.
 - [x] 64-bit exe build verified (release).
 
+### Phase 5 — Rustification & GSV live (pure Rust, no YAML/TOML shells)
+
+- [ ] **Ratio 95–100% Rust**: keep `gsv-loc-audit --stretch-96` ≥96% (now 99.4%). Replace any needed non-RS file with RS where logical: shell → `cargo xtask` (Rust), config handled in Rust, CI logic in Rust.
+- [ ] **GSV live integration**: support `GSV_LIVE=1` / `http://127.0.0.1:9999` — progress / metrics can be reported to GSV `vision` / `speed` endpoints; `abrakadabra` ticket flow compatible (`PRODUCTS.md` already registered). No Python, no extra daemons — thin Rust glue.
+- [ ] **Speed**: keep `cargo bench --bench speed` for `time_to_first_token` + `tokens_per_sec`; zero-copy paths, no mid-inference allocs.
+
+### Phase 6 — Staged model loading (disk → RAM ступенями)
+
+- [ ] Research `llama_cpp_2::model::params::LlamaModelParams` flags: `use_mmap` / `use_mlock` / `no_alloc` + `with_progress_callback(|p: f32| -> bool)`.
+- [ ] Implement `Model::load_staged` / `StagedLoadOptions` in `src/safe/staged.rs`: stages — `Mmap` (file stays on disk, paged), `Mlock` (pin to RAM), `Prefault` (touch pages), with progress `0.0..1.0` and abort support. Pure Rust orchestration; backend stays `llama-cpp-2`.
+- [ ] CLI: `--mmap/--no-mmap --mlock` + `--progress` flag; `generate` already streams.
+- [ ] Docs + bench: `docs/SIZING.md` loading modes vs RAM, `docs/BENCHMARKS.md` staged times.
+
 ---
 
 ## Next steps (prioritized)
 
-See **[NEXT_STEPS.md](NEXT_STEPS.md)** for the Rust-architect roadmap: P0 stability → P1 API ergonomics → P2 performance → P3 features.
+See **[NEXT_STEPS.md](NEXT_STEPS.md)** for the Rust-architect roadmap: P0 staged loading → P1 rustification+GSV → P2 ratio/speed. Smaller 7B model not needed — focus is Rust & staged RAM control on existing 27B mmap.
 
 ---
 
 ## 4. Tools
 
 - **rustc** — compiler (via `cargo`).
-- **cargo** — build, test, bench.
+- **cargo** — build, test, bench; `cargo xtask` (Rust) replaces shell where possible (MSYS2 bash only when needed).
 - **git** — version control; for push use **gittoken** (Personal Access Token or credential helper).
+- **GSV live** — `http://127.0.0.1:9999` (optional, for `abrakadabra` / vision).
 
 ---
 
 ## 5. Target Platform
 
-- **OS:** Windows (per paths like S:\rust\...).
-- **Target:** `x86_64-pc-windows-msvc` for a 64-bit `.exe`.
-- **Model:** `models/Qwen3.8-27B-UD-IQ2_XXS.gguf` (from `L:\qwen4lama_rs\Qwen3.8-27B-UD-IQ2_XXS.gguf`).
+- **OS:** Windows (MSYS2 bash for `cargo`/`git`; `stable-x86_64-pc-windows-gnu`).
+- **Target:** `x86_64-pc-windows-gnu` (GNU; `MSVC` also works if `LIBCLANG_PATH` set) for a 64-bit `.exe`.
+- **Model:** `models/Qwen3.8-27B-UD-IQ2_XXS.gguf` (mmap, `CPU_Mapped` 6.9 GiB; staged load via `use_mmap`/`use_mlock`).
 
 Verification:
 

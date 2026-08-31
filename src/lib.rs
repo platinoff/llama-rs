@@ -24,6 +24,7 @@ pub use safe::embed;
 pub use safe::generate_with_metrics;
 pub use safe::{
     generate, generate_stream, Backend, Context, GenerateOptions, GenerateOptionsBuilder, Model,
+    StagedLoadOptions,
 };
 
 /// Default params for loading a model. Re-export of [llama_cpp_2::model::params::LlamaModelParams].

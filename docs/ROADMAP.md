@@ -23,7 +23,16 @@
 - [x] `llama_rs.exe models/Qwen3.8-27B-UD-IQ2_XXS.gguf "Hello" --max-tokens 8 --temperature 0 --seed 1` — loads via mmap (CPU_Mapped 6918.98 MiB, no 8 GiB RAM needed) and generates: `, I'm a 17-year`, `EXIT=0` (2026-08-29)
 
 ## Next
-- [x] `benches/speed.rs`: run + record benchmark on the now-loadable Qwen3.8-27B model (2026-08-30: 0.031 tok/s, 248 s TTF, 5500U mmap; `docs/BENCHMARKS.md`) + `Context::reset()` fix for hybrid M-RoPE
+- [x] `benches/speed.rs`: run + record benchmark on the now-loadable Qwen3.8-27B model (2026-08-30: 0.031 tok/s, 248 s TTF, 5500U mmap; `docs/BENCHMARKS.md`) + `Context::reset()` fix for hybrid M-RoPE (2026-08-31 E2E passed 156s)
 
-## Next (bench follow-up)
-- [ ] Smaller model / GPU bench (27B mmap throttles ~0.6 GiB free; needs 7B or GPU for tok/s)
+## Phase 5 — Rustification & GSV live (pure Rust, no smaller model)
+
+- [ ] Keep Rust ratio ≥96% (`gsv-loc-audit --stretch-96` now 99.46%): replace shell/YAML where logical with `cargo xtask` in Rust; no Python/Java
+- [ ] GSV live compat: `PRODUCTS.md` already lists `llama-rs`; ensure `abrakadabra` drain + ticket flow works, optional progress → GSV vision
+- [ ] Speed: retain `tokens_per_sec` / `time_to_first_token` benches; ultra-speed zero-copy paths
+
+## Phase 6 — Staged model loading (disk → RAM ступенями)
+
+- [ ] Implement `src/safe/staged.rs` (`StagedLoadOptions` + `Model::load_staged`): `use_mmap` (mmap, paged), `use_mlock` (pin), `with_progress_callback` (0.0..1.0, abort). Pure Rust, backend `llama-cpp-2`
+- [ ] CLI flags `--mmap/--no-mmap --mlock` + progress output
+- [ ] Docs: `SIZING.md` loading modes vs RAM, `BENCHMARKS.md` staged timings; `ARCHITECTURE.md` staged layer

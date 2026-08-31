@@ -8,6 +8,7 @@ mod context;
 mod embed;
 mod generate;
 mod model;
+mod staged;
 
 pub use backend::Backend;
 pub use context::{Context, GenerateOptions, GenerateOptionsBuilder};
@@ -17,3 +18,4 @@ pub use embed::embed;
 pub use generate::generate_with_metrics;
 pub use generate::{generate, generate_stream};
 pub use model::Model;
+pub use staged::StagedLoadOptions;

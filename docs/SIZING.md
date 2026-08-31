@@ -27,3 +27,15 @@ You get the actual values from a [Context](crate::Context) with [Context::n_ctx]
 - **Max speed (prefill):** Use `n_batch` equal to or close to `n_ctx` so long prompts are decoded in fewer steps. Generation speed is then dominated by single-token decode cost.
 
 Configure via [ContextParams](crate::ContextParams) (from llama-cpp-2) when creating the context; defaults are set by the upstream crate.
+
+## Staged model loading (disk → RAM ступенями)
+
+Controls how the GGUF file is brought to RAM (`StagedLoadOptions` in `src/safe/staged.rs`, `Model::load_staged`).
+
+| Mode | `use_mmap` | `use_mlock` | RAM | Start | Use case |
+|------|------------|-------------|-----|-------|----------|
+| **mmap** (default) | true | false | ~0.6 GiB free OK (27B mapped 6.9 GiB, paged) | fast | 5500U 16 GiB, low-RAM — current `BENCHMARKS.md` (0.031 tok/s, 248s TTF) |
+| **resident** | false | false | ~8 GiB resident (full read) | slower | Enough RAM, no paging |
+| **pinned** | true | true | pinned (mlock) | fast, no swap | Privilege + RAM, avoids swap |
+
+Progress: `Model::load_staged(backend, path, opts, Some(|p: f32| { /* 0.0..1.0 */ true }))`; `false` aborts. CLI: `--mmap/--no-mmap --mlock --progress` + `GSV_LIVE=1` optional. Pure Rust; backend `llama-cpp-2` `load_mode` + `with_progress_callback`.
