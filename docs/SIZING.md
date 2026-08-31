@@ -21,12 +21,12 @@ You get the actual values from a [Context](crate::Context) with [Context::n_ctx]
 - **Larger n_batch** (up to `n_ctx`) → fewer decode steps for a long prompt (faster prefill). For generation, we decode one new token per step, so generation speed is mostly independent of `n_batch`.
 - **n_ctx** does not directly change tokens/sec once the context is allocated; it caps how long the prompt + continuation can be.
 
-## Presets (conceptual)
+## Presets (implemented in `src/safe/context.rs:196`)
 
-- **Low memory:** Use a smaller `n_ctx` (e.g. 2048) and moderate `n_batch` (e.g. 512). Reduces peak RAM.
-- **Max speed (prefill):** Use `n_batch` equal to or close to `n_ctx` so long prompts are decoded in fewer steps. Generation speed is then dominated by single-token decode cost.
+- **Low memory:** `llama_rs::context_presets::low_memory()` → `n_ctx=2048, n_batch=512` (small KV cache, fits 16 GiB + 27B mmap).
+- **Max speed (prefill):** `llama_rs::context_presets::max_speed()` → `n_ctx=4096, n_batch=2048` (batch≈ctx, fewer prefill steps).
 
-Configure via [ContextParams](crate::ContextParams) (from llama-cpp-2) when creating the context; defaults are set by the upstream crate.
+Configure via [ContextParams](crate::ContextParams) (`LlamaContextParams::with_n_ctx`/`with_n_batch`) when creating the context; presets are pure Rust helpers, defaults via upstream.
 
 ## Staged model loading (disk → RAM ступенями)
 

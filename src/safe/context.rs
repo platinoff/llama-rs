@@ -184,6 +184,52 @@ impl Default for GenerateOptions {
     }
 }
 
+/// Presets for `ContextParams` (pure Rust, see `docs/SIZING.md`).
+///
+/// `low_memory()` → `n_ctx=2048, n_batch=512` (small KV cache, fits 16 GiB + 27B mmap).
+/// `max_speed()` → `n_ctx=4096, n_batch=2048` (larger batch for faster prefill).
+pub mod presets {
+    use crate::ContextParams;
+    use std::num::NonZeroU32;
+
+    /// Low-memory preset: `n_ctx=2048`, `n_batch=512`.
+    #[must_use]
+    pub fn low_memory() -> ContextParams {
+        ContextParams::default()
+            .with_n_ctx(NonZeroU32::new(2048))
+            .with_n_batch(512)
+    }
+
+    /// Max-speed preset: `n_ctx=4096`, `n_batch=2048` (prefill in fewer steps).
+    #[must_use]
+    pub fn max_speed() -> ContextParams {
+        ContextParams::default()
+            .with_n_ctx(NonZeroU32::new(4096))
+            .with_n_batch(2048)
+    }
+}
+
+#[allow(clippy::items_after_test_module)]
+#[cfg(test)]
+mod preset_tests {
+    use super::presets;
+    use std::num::NonZeroU32;
+
+    #[test]
+    fn low_memory_preset() {
+        let p = presets::low_memory();
+        assert_eq!(p.n_ctx(), NonZeroU32::new(2048));
+        assert_eq!(p.n_batch(), 512);
+    }
+
+    #[test]
+    fn max_speed_preset() {
+        let p = presets::max_speed();
+        assert_eq!(p.n_ctx(), NonZeroU32::new(4096));
+        assert_eq!(p.n_batch(), 2048);
+    }
+}
+
 /// Generate text from a prompt using the given context and model. Pure Rust orchestration.
 /// If `on_chunk` is `Some`, it is called with each decoded text piece (streaming).
 /// If `metrics` is `Some`, it is filled with tokens_generated, decode_count, wall_time_ms.

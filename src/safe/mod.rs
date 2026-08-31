@@ -11,7 +11,7 @@ mod model;
 mod staged;
 
 pub use backend::Backend;
-pub use context::{Context, GenerateOptions, GenerateOptionsBuilder};
+pub use context::{presets as context_presets, Context, GenerateOptions, GenerateOptionsBuilder};
 #[cfg(feature = "embeddings")]
 pub use embed::embed;
 #[cfg(feature = "metrics")]
