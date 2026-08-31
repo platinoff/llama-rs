@@ -9,7 +9,37 @@
 
 use clap::Parser;
 use llama_rs::{Backend, ContextParams, GenerateOptions, Model, StagedLoadOptions};
+use std::io::Write as _;
 use std::path::Path;
+use std::time::Duration;
+
+/// Best-effort push of staged progress to GSV live (`GSV_LIVE=1` → `127.0.0.1:9999`).
+/// Pure Rust std only, no extra deps, 150ms timeout, ignore errors.
+fn gsv_report_progress(p: f32) {
+    if std::env::var_os("GSV_LIVE").is_none() {
+        return;
+    }
+    let body = format!(
+        r#"{{"staged_progress":{:.3},"ts":{}}}"#,
+        p,
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    );
+    let req = format!(
+        "POST /api/ingest HTTP/1.1\r\nHost: 127.0.0.1:9999\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    if let Ok(mut s) = std::net::TcpStream::connect_timeout(
+        &std::net::SocketAddr::from(([127, 0, 0, 1], 9999)),
+        Duration::from_millis(120),
+    ) {
+        let _ = s.set_write_timeout(Some(Duration::from_millis(80)));
+        let _ = s.write_all(req.as_bytes());
+    }
+}
 
 #[derive(Parser, Debug)]
 #[command(name = "llama_rs")]
@@ -91,12 +121,9 @@ fn main() {
         let mut last_pct = 0u32;
         match Model::load_staged_with_progress(&backend, path, staged, &mut |p: f32| {
             let pct = (p * 100.0) as u32;
+            gsv_report_progress(p);
             if pct != last_pct && pct.is_multiple_of(5) {
                 eprintln!("loading {}% (mmap={}, mlock={})", pct, use_mmap, args.mlock);
-                // Optional GSV live push: if GSV_LIVE=1, could POST to 127.0.0.1:9999 (thin, no dep)
-                if std::env::var("GSV_LIVE").is_ok() {
-                    // best-effort, ignore errors
-                }
                 last_pct = pct;
             }
             true

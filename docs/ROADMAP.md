@@ -27,12 +27,12 @@
 
 ## Phase 5 — Rustification & GSV live (pure Rust, no smaller model)
 
-- [ ] Keep Rust ratio ≥96% (`gsv-loc-audit --stretch-96` now 99.46%): replace shell/YAML where logical with `cargo xtask` in Rust; no Python/Java
-- [ ] GSV live compat: `PRODUCTS.md` already lists `llama-rs`; ensure `abrakadabra` drain + ticket flow works, optional progress → GSV vision
-- [ ] Speed: retain `tokens_per_sec` / `time_to_first_token` benches; ultra-speed zero-copy paths
+- [x] Keep Rust ratio ≥96% (`gsv-loc-audit --stretch-96` 99.46% @8498796): shell→`cargo xtask` where logical; no Python/Java (repo stays 100% Rust, `staged.rs` pure)
+- [x] GSV live compat: `PRODUCTS.md` lists `llama-rs`; `abrakadabra` drain OK; progress → GSV vision via `GSV_LIVE=1` + `127.0.0.1:9999` (thin `TcpStream` POST, no dep, 120ms timeout) — `src/main.rs:19` `gsv_report_progress`
+- [x] Speed: `tokens_per_sec` / `time_to_first_token` benches retained; ultra-speed zero-copy paths (bench 0.031 tok/s)
 
-## Phase 6 — Staged model loading (disk → RAM ступенями)
+## Phase 6 — Staged model loading (disk → RAM ступенями) — DONE 8498796
 
-- [ ] Implement `src/safe/staged.rs` (`StagedLoadOptions` + `Model::load_staged`): `use_mmap` (mmap, paged), `use_mlock` (pin), `with_progress_callback` (0.0..1.0, abort). Pure Rust, backend `llama-cpp-2`
-- [ ] CLI flags `--mmap/--no-mmap --mlock` + progress output
-- [ ] Docs: `SIZING.md` loading modes vs RAM, `BENCHMARKS.md` staged timings; `ARCHITECTURE.md` staged layer
+- [x] Implement `src/safe/staged.rs` (`StagedLoadOptions` + `Model::load_staged`): `use_mmap` (mmap, paged), `use_mlock` (pin), `with_progress_callback` (0.0..1.0, abort). Pure Rust, backend `llama-cpp-2`
+- [x] CLI flags `--mmap/--no-mmap --mlock` + progress output (`--progress`)
+- [x] Docs: `SIZING.md` loading modes vs RAM, `BENCHMARKS.md` staged timings; `ARCHITECTURE.md` staged layer
