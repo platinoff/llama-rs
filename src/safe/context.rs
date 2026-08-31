@@ -52,6 +52,17 @@ impl<'a> Context<'a> {
     pub fn n_batch(&self) -> u32 {
         self.inner.n_batch()
     }
+
+    /// Reset the context so a fresh sequence can start.
+    ///
+    /// Clears the KV cache / recurrent memory. Required between independent
+    /// generations on the same context: hybrid (Gated Delta Net / M-RoPE)
+    /// models require strictly increasing sequence positions, so re-attempting
+    /// a prompt at position 0 without a reset fails the decode.
+    #[inline]
+    pub fn reset(&mut self) {
+        self.inner.clear_kv_cache();
+    }
 }
 
 /// Options for text generation (all Rust types).

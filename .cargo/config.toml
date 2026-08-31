@@ -3,3 +3,10 @@ LIBCLANG_PATH = { value = "S:\\rust\\llama-rs\\.llvm", force = true }
 BINDGEN_EXTRA_CLANG_ARGS = { value = "-isystem S:/rust/llama-rs/.llvm/lib/clang/18/include -isystem C:/msys64/mingw64/include", force = true }
 CMAKE_C_FLAGS_RELEASE = { value = "-D_WIN32_WINNT=0x0A00", force = true }
 CMAKE_CXX_FLAGS_RELEASE = { value = "-D_WIN32_WINNT=0x0A00", force = true }
+CMAKE = { value = "S:\\rust\\llama-rs\\.cmake\\cmake-3.31.9-windows-x86_64\\bin\\cmake.exe", force = true }
+
+[target.x86_64-pc-windows-gnu]
+# libstdc++ internals (seekpos, codecvt_utf8_utf16) are not exported by the
+# shared import lib; link the full archive so the exes do not depend on a
+# runtime DLL (and cannot be shadowed by stray DLLs in the repo root).
+rustflags = ["-C", "link-arg=-static-libstdc++"]

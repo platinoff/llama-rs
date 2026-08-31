@@ -38,6 +38,7 @@ fn bench_inference_tokens_per_sec(c: &mut Criterion) {
 
     c.bench_function("inference_tokens_per_sec", |b| {
         b.iter(|| {
+            context.reset();
             black_box(
                 llama_rs::generate(&model, &mut context, "One two three.", &opts)
                     .expect("generate"),
@@ -69,6 +70,7 @@ fn bench_time_to_first_token(c: &mut Criterion) {
 
     c.bench_function("time_to_first_token", |b| {
         b.iter(|| {
+            context.reset();
             let first = std::sync::atomic::AtomicBool::new(true);
             let ttf = std::sync::atomic::AtomicU64::new(0);
             let start = std::time::Instant::now();

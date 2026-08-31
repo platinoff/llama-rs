@@ -26,6 +26,7 @@ build.pid
 test.log
 /models/
 /.llvm/
+/.cmake/
 
 # Env and secrets
 .env

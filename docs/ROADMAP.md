@@ -23,4 +23,7 @@
 - [x] `llama_rs.exe models/Qwen3.8-27B-UD-IQ2_XXS.gguf "Hello" --max-tokens 8 --temperature 0 --seed 1` — loads via mmap (CPU_Mapped 6918.98 MiB, no 8 GiB RAM needed) and generates: `, I'm a 17-year`, `EXIT=0` (2026-08-29)
 
 ## Next
-- [ ] `benches/speed.rs`: run + record benchmark on the now-loadable Qwen3.8-27B model
+- [x] `benches/speed.rs`: run + record benchmark on the now-loadable Qwen3.8-27B model (2026-08-30: 0.031 tok/s, 248 s TTF, 5500U mmap; `docs/BENCHMARKS.md`) + `Context::reset()` fix for hybrid M-RoPE
+
+## Next (bench follow-up)
+- [ ] Smaller model / GPU bench (27B mmap throttles ~0.6 GiB free; needs 7B or GPU for tok/s)

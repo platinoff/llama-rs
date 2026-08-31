@@ -21,6 +21,28 @@ When `LLAMA_RS_BENCH_MODEL` is set to a GGUF path, the **`inference_tokens_per_s
 - Loads the model once, then measures time per short generation (32 tokens, stop_at_eos).
 - Approximate tokens/sec = 32 / (time per iteration in seconds).
 
+## Results (2026-08-30)
+
+Hardware: AMD Ryzen 5 5500U (6c/12t), 16 GB RAM (≈0.6 GiB free during run),
+Windows 10, release profile, `n_ctx_default = 512`.
+
+Model: `models/Qwen3.8-27B-UD-IQ2_XXS.gguf` (27B Gated Delta Net / M-RoPE,
+threads = physical cores).
+
+Run: `LLAMA_RS_BENCH_MODEL=models/Qwen3.8-27B-UD-IQ2_XXS.gguf cargo bench
+--bench speed -- --sample-size 10`.
+
+| Benchmark | Median | Notes |
+|---|---|---|
+| `hello_llama_rust` | 1.53 ns | baseline; no model load |
+| `inference_tokens_per_sec` | 1020.1 s / iter | 32-token generation (stop_at_eos); ≈ 0.031 tok/s |
+| `time_to_first_token` | 248.25 s | first decoded token after prefill |
+
+> `inference_tokens_per_sec` ≈ 32 / 1020.1 s ≈ **0.031 tokens/s** on this
+> 27B IQ2_XXS model with mmap on a 5500U. Expect seconds-scale numbers only
+> with a smaller / quantized model or a GPU. Memory pressure (≈0.6 GiB free)
+> throttles the run heavily.
+
 ## Verification
 
 Example with a real model:
