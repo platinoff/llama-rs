@@ -93,16 +93,20 @@ Benchmarks are defined in `benches/`. After integrating with llama.cpp you can a
      Or enter the token as the password when running `git push` if using a credential manager.
    - If your default branch is `main`: run `git branch -M main` then `git push -u origin main`.
 
-## Useful commands
+## Useful commands (pure Rust, no shell/YAML)
 
-| Action      | Command                 |
-|------------|-------------------------|
-| Build      | `cargo build --release` |
-| Test       | `cargo test`            |
-| Benchmarks | `cargo bench`           |
-| Check      | `cargo check`          |
-| Lint       | `cargo clippy`          |
-| Format     | `cargo fmt`             |
+| Action      | Command                 | xtask |
+|------------|-------------------------|-------|
+| Build      | `cargo build --release` | `cargo xtask check` = fmt --check + clippy + test |
+| Test       | `cargo test`            | `cargo xtask test` |
+| Benchmarks | `cargo bench`           | — |
+| Check      | `cargo check`          | `cargo xtask clippy` |
+| Lint       | `cargo clippy`          | `cargo xtask clippy` |
+| Format     | `cargo fmt`             | `cargo xtask fmt` |
+| Ratio      | `cargo run --manifest-path S:/rust/GSV/Cargo.toml --bin gsv-loc-audit -- --repo-root S:/rust/llama-rs --stretch-96` | `cargo xtask loc` (99.46% now) |
+| Sizing     | `docs/SIZING.md`        | `cargo xtask sizing` |
+
+`cargo xtask` is pure Rust (`xtask/src/main.rs`, no Python/Java) — replaces shell where logical, keeps ratio ≥96%. MSYS2 bash only for `cargo`/`git`.
 
 See [BENCHMARKS.md](BENCHMARKS.md) for speed benchmarks and inference metrics.
 

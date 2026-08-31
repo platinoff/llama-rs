@@ -38,3 +38,6 @@ strip = true
 [[bench]]
 name = "speed"
 harness = false
+
+[workspace]
+members = ["xtask"]

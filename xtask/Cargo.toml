@@ -1,0 +1,9 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2021"
+description = "llama-rs xtask — pure Rust task runner (replaces shell/YAML where logical)"
+license = "MIT"
+publish = false
+
+[dependencies]
