@@ -2,10 +2,14 @@
 name = "llama_rs"
 version = "0.1.0"
 edition = "2021"
-description = "llama.rs — Llama in Rust: Rust-native inference API, backend by llama.cpp"
+description = "llama.rs — Llama in Rust: Rust-native inference API, backend by llama.cpp (staged disk→RAM, GSV live, pure Rust)"
 license = "MIT"
 readme = "README.md"
-repository = ""
+repository = "https://github.com/platinoff/llama-rs"
+authors = ["platinoff"]
+keywords = ["llama", "llm", "inference", "gguf", "rust"]
+categories = ["science", "machine-learning"]
+exclude = ["models/*.gguf", "target/*", ".llvm/*", ".cmake/*", "llama.cpp-master/*"]
 
 [features]
 default = []

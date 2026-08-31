@@ -4,7 +4,6 @@
 
 mod backend;
 mod context;
-#[cfg(feature = "embeddings")]
 mod embed;
 mod generate;
 mod model;
@@ -13,7 +12,8 @@ mod staged;
 pub use backend::Backend;
 pub use context::{presets as context_presets, Context, GenerateOptions, GenerateOptionsBuilder};
 #[cfg(feature = "embeddings")]
-pub use embed::embed;
+pub use embed::{embed, embed_normalized};
+pub use embed::{l2_norm, l2_normalize, mean_pool};
 #[cfg(feature = "metrics")]
 pub use generate::generate_with_metrics;
 pub use generate::{generate, generate_stream};
