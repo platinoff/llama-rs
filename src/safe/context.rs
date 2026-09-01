@@ -232,7 +232,7 @@ mod preset_tests {
 
 /// Generate text from a prompt using the given context and model. Pure Rust orchestration.
 /// If `on_chunk` is `Some`, it is called with each decoded text piece (streaming).
-/// If `metrics` is `Some`, it is filled with tokens_generated, decode_count, wall_time_ms.
+/// If `metrics` is `Some`, it is filled with pp/tg/TTFT (llama-bench phases).
 pub(crate) fn generate_impl(
     model: &llama_cpp_2::model::LlamaModel,
     context: &mut Context<'_>,
@@ -250,6 +250,7 @@ pub(crate) fn generate_impl(
         return Ok(String::new());
     }
 
+    let prompt_tokens = tokens.len() as u32;
     let n_ctx = context.n_ctx() as i32;
     let n_batch = context.n_batch() as usize;
     let eos_token = model.token_eos();
@@ -261,9 +262,13 @@ pub(crate) fn generate_impl(
         .add_sequence(&tokens, seq_id, false)
         .map_err(|e| Error::Decode(e.to_string()))?;
     context.decode(&mut batch)?;
+    let prompt_ms = start.elapsed().as_millis() as u64;
     if let Some(m) = metrics.as_mut() {
         m.decode_count += 1;
+        m.prompt_tokens = prompt_tokens;
+        m.prompt_ms = prompt_ms;
     }
+    let mut ttft_ms: Option<u64> = None;
 
     let mut sampler = LlamaSampler::chain_simple([
         LlamaSampler::temp(if opts.temperature <= 0.0 {
@@ -300,6 +305,14 @@ pub(crate) fn generate_impl(
             Err(e) => return Err(Error::TokenToString(e.to_string())),
         };
         running_output.push_str(&piece);
+        if ttft_ms.is_none() {
+            ttft_ms = Some(start.elapsed().as_millis() as u64);
+        }
+        if let Some(m) = metrics.as_mut() {
+            if m.ttft_ms.is_none() {
+                m.ttft_ms = ttft_ms;
+            }
+        }
         if let Some(f) = on_chunk.as_mut() {
             f(&piece);
         }
@@ -333,6 +346,8 @@ pub(crate) fn generate_impl(
     if let Some(m) = metrics.as_mut() {
         m.tokens_generated = n_gen;
         m.wall_time_ms = start.elapsed().as_millis() as u64;
+        m.ttft_ms = ttft_ms.or(m.ttft_ms);
+        m.eval_ms = m.wall_time_ms.saturating_sub(m.prompt_ms);
     }
     Ok(running_output)
 }

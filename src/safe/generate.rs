@@ -35,7 +35,7 @@ where
     )
 }
 
-/// Generate text and collect metrics (tokens generated, decode count, wall time). Requires feature `metrics`.
+/// Generate text and collect metrics (pp/tg/TTFT, llama-bench style). Requires feature `metrics`.
 #[cfg(feature = "metrics")]
 pub fn generate_with_metrics(
     model: &Model,
@@ -50,6 +50,31 @@ pub fn generate_with_metrics(
         prompt,
         opts,
         None,
+        Some(&mut metrics),
+    )?;
+    Ok((s, metrics))
+}
+
+/// Generate with streaming + metrics (ttft captured via first chunk timing).
+#[cfg(feature = "metrics")]
+pub fn generate_stream_with_metrics<F>(
+    model: &Model,
+    context: &mut Context<'_>,
+    prompt: &str,
+    opts: &GenerateOptions,
+    on_chunk: F,
+) -> Result<(String, crate::InferenceMetrics)>
+where
+    F: FnMut(&str),
+{
+    let mut metrics = crate::InferenceMetrics::default();
+    let mut cb = on_chunk;
+    let s = super::context::generate_impl(
+        &model.inner,
+        context,
+        prompt,
+        opts,
+        Some(&mut cb),
         Some(&mut metrics),
     )?;
     Ok((s, metrics))

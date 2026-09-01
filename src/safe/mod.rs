@@ -14,8 +14,8 @@ pub use context::{presets as context_presets, Context, GenerateOptions, Generate
 #[cfg(feature = "embeddings")]
 pub use embed::{embed, embed_normalized};
 pub use embed::{l2_norm, l2_normalize, mean_pool};
-#[cfg(feature = "metrics")]
-pub use generate::generate_with_metrics;
 pub use generate::{generate, generate_stream};
+#[cfg(feature = "metrics")]
+pub use generate::{generate_stream_with_metrics, generate_with_metrics};
 pub use model::Model;
 pub use staged::StagedLoadOptions;
