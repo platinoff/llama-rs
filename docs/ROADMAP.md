@@ -22,6 +22,10 @@
       - New registry `build.rs` Windows-GNU patches: link `cpp-httplib` (from `out/build/vendor/cpp-httplib`), link `llama-common-base` for `build-info.cpp` symbols (llama_commit/llama_build_*), link `advapi32`/`shell32`/`ws2_32` (upstream only links advapi32 for MSVC)
 - [x] `llama_rs.exe models/Qwen3.8-27B-UD-IQ2_XXS.gguf "Hello" --max-tokens 8 --temperature 0 --seed 1` — loads via mmap (CPU_Mapped 6918.98 MiB, no 8 GiB RAM needed) and generates: `, I'm a 17-year`, `EXIT=0` (2026-08-29)
 
+## Phase 7 — GSV keep-live heartbeat (band 226) — DONE
+
+- [x] `GSV_LIVE=1` **or** `LLAMA_RS_HEARTBEAT=1` → write `target/live/llama_heartbeat.json` (atomic temp+rename, 15s tick) shaped `{pid, model, epoch_secs, bin_version}` — the exact schema GSV `boxes/keep_live.rs` `LlamaHeartbeat` reads (fresh ≤ 60s, 1s file probe, no HTTP). E2E: GSV `/api/health` `keep_live.llama_rs.alive=true` + hint `llama_rs up` + keep-live card row. Pure std, no dep, `src/main.rs` `spawn_llama_heartbeat`.
+
 ## Next
 - [x] `benches/speed.rs`: run + record benchmark on the now-loadable Qwen3.8-27B model (2026-08-30: 0.031 tok/s, 248 s TTF, 5500U mmap; `docs/BENCHMARKS.md`) + `Context::reset()` fix for hybrid M-RoPE (2026-08-31 E2E passed 156s)
 
