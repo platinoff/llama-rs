@@ -1,3 +1,13 @@
+<p align="center">
+  <img src="docs/assets/presentations/llama-rs-hero.svg" alt="llama.rs — Llama in Rust. Rust-native inference." width="100%">
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT"></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/rust-100%25-orange?logo=rust" alt="Rust 100%"></a>
+  <a href="https://github.com/sponsors/platinoff"><img src="https://img.shields.io/badge/sponsor-GitHub-ea4aaa?logo=github-sponsors" alt="Sponsor"></a>
+</p>
+
 # llama.rs · Llama in Rust
 
 **llama.rs** is a **Rust-native** implementation of Llama inference: API, orchestration, and control flow are written in Rust. The compute backend is [llama.cpp](https://github.com/ggml-org/llama.cpp) (via the `llama-cpp-2` crate), but **this codebase is 100% Rust** — no C/C++ in the repo.
@@ -104,15 +114,23 @@ Use these from the project root (on Windows, use the same environment as in step
 - [docs/SIZING.md](docs/SIZING.md) — n_ctx / n_batch and memory.
 - [docs/GITHUB_SETUP.md](docs/GITHUB_SETUP.md) — GitHub repo and push.
 
-## Support the developer
+## ❤️ Support / Donate
 
-If you find llama.rs useful and want to support its development, you can send **Solana (SOL)** to:
+llama.rs is MIT and maintained in the open. If the tool saves you a session, here is how to keep it independent — pick whatever fits.
 
-```
-GcdgNtdE8NEk3z9sQ5jXv2tqguZjSYqPqNAtjsjPNJx8
-```
+<p align="center">
+  <a href="https://github.com/platinoff/llama-rs/stargazers"><img src="https://img.shields.io/badge/⭐_Star_the_repo-black?style=for-the-badge" alt="Star"></a>
+  <a href="https://github.com/sponsors/platinoff"><img src="https://img.shields.io/badge/GitHub_Sponsors-ea4aaa?style=for-the-badge&logo=github-sponsors&logoColor=white" alt="GitHub Sponsors"></a>
+</p>
 
-Thank you.
+| | |
+|---|---|
+| ⭐ **Star** | Free, and it actually helps people find the repo |
+| 🐙 **[GitHub Sponsors](https://github.com/sponsors/platinoff)** | One-off or monthly · [github.com/sponsors/platinoff](https://github.com/sponsors/platinoff) |
+| 💰 **Solana (SOL)** | `GcdgNtdE8NEk3z9sQ5jXv2tqguZjSYqPqNAtjsjPNJx8` |
+| 🐛 **Issues** | Bugs and ideas: [github.com/platinoff/llama-rs/issues](https://github.com/platinoff/llama-rs/issues) |
+
+---
 
 ## License
 
