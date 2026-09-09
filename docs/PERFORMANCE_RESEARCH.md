@@ -105,12 +105,20 @@ count (default 32), then prints `InferenceMetrics::to_json()`.
 Dense 27B is the wrong model shape for 7.4 GB. `qwen3moe` arch is supported by
 llama-cpp-2 0.1.154's bundled llama.cpp
 (`llama.cpp/src/llama-arch.cpp:37`, `models/qwen3moe.cpp`), so llama.rs can load
-MoE GGUFs today. Best candidates (decode ~5–10× faster than dense 27B):
+MoE GGUFs today. Best candidates (decode 40–100× faster than dense 27B). Sizes
+verified 2026-09-09 from unsloth / qtum / bartowski HF repos:
 
-| Model | File size class | Expected decode (6-core CPU) |
-|---|---|---|
-| Qwen3-30B-A3B IQ2/IQ3 | ~8–9 GB (mmap-ok when RAM is free) | ~5–10 tok/s (MoE: only ~3.3B active) |
-| Qwen3-8B-A3B Q4_K_M | ~5–6 GB (fits resident) | similar tok/s, lower quality |
+| Model | File (min quants) | Active/token | Expected decode (6-core 5500U) |
+|---|---|---|---|
+| **Qwen3-30B-A3B** (Apr 2025) UD-IQ2_XS / IQ2_XXS | 8.7 / 7.6 GB | **3.3B** | ~2–6 tok/s — same file class as current, arch `qwen3moe` already in llama-rs |
+| Qwen3-Coder-30B-A3B | same class | 3.3B | same; code-focused |
+| Qwen3.5/3.6-35B-A3B (2026) UD-IQ2_XXS / UD-IQ2_M | 10.8–11.9 GB | ~3B | better quality but file > total RAM — mmap-thrash risk on 7.4 GB |
+| Qwen3.8-27B (current, dense) | 9.0 GB UD-IQ2_XXS | **27B** (all) | **0.045 measured** — Qwen 3.8 dropped the mid MoE band (27B dense → 180B) |
+
+Per-token reads for A3B at ~2.2 bpw ≈ 0.9 GB vs ~2.4 GB for current dense IQ2 →
+RAM bandwidth no longer melts the machine. Reference: same-machine dense-vs-MoE
+measurement (M4 Max): Qwen3.6-27B q4 = 16.6 t/s vs Qwen3.6-35B-A3B iq4 = 45.1
+t/s (batiai/Qwen3.8-27B-GGUF card).
 
 ## Operational rules (cheap, immediate)
 
@@ -130,7 +138,7 @@ MoE GGUFs today. Best candidates (decode ~5–10× faster than dense 27B):
 | criterion baseline (already have) | Qwen 27B IQ2, mmap, apps open | 0.031 |
 | `llama_speed` + RAM free (~2.5 GiB) | Qwen 27B IQ2, mmap | ~0.5–1 (theoretical, untested) |
 | `llama_speed` + `resident` (if fits w/ apps closed) | Qwen 27B IQ2 | ~0.5–1 |
-| `llama_speed` (benchmark to run) | Qwen3-30B-A3B IQ2 / 8B-A3B Q4 | 5–10 |
+| `llama_speed` (benchmark to run) | Qwen3-30B-A3B UD-IQ2_XS / IQ2_XXS | 2–6 |
 
 ## References
 
