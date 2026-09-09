@@ -6,10 +6,13 @@ All notable changes to `llama_rs` (pure Rust, `llama-cpp-2` backend).
 
 ### Added
 - **Fast bench bin** (`src/bin/llama_speed.rs`, `Cargo.toml:27` `required-features = ["metrics"]`): single-pass pp/tg/TTFT llama-bench-style measurement via `generate_with_metrics` + `InferenceMetrics::to_json`-compatible JSON line; minutes instead of criterion's multi-hour `--sample-size >= 10` runs (`docs/PERFORMANCE_RESEARCH.md` Phase 1)
-- **Research doc** (`docs/PERFORMANCE_RESEARCH.md`): root-cause analysis of the 0.03 tok/s vs ~1 tok/s gap (7.4 GB box memory thrash + mmap refault, llama.cpp #27840/#24037), verified llama-rs/exposed knobs, Rust plan Phases 1–3
+- **RAM preflight** (`src/safe/preflight.rs`, Phase 2): `advise(free_mib, model_mib, &staged)` → `PreferResident` when mmap & free ≥ model + 1024 MiB headroom, `KeepMmap{deficit_mib}` when free < model (refault risk), `FallbackToMmap` when resident requested but doesn't fit; `low_ram_staged()` picks `resident` vs `mmap`; `warnings()` → human text. Free RAM via `sysinfo` 0.38 (safe), model size via `fs::metadata`. `llama_speed --skip-preflight` to silence stderr warnings (9 unit tests)
+- **Preset** `context_presets::cpu_low_ram()` (`src/safe/context.rs`): `n_ctx=2048, n_batch=512` for < 8 GiB boxes, paired with preflight load-mode selection (`docs/SIZING.md`)
+- **Research doc** (`docs/PERFORMANCE_RESEARCH.md`): root-cause analysis of the 0.03 tok/s vs ~1 tok/s gap (7.4 GB box memory thrash + mmap refault, llama.cpp #27840/#24037), verified llama-rs/exposed knobs, Rust plan Phases 1–3; Phase 2 marked implemented
 
 ### Fixed
 - RAM facts corrected to **7.4 GB** total (was “16 GB”) in `docs/BENCHMARKS.md:26` and `docs/SIZING.md:26,37`; mmap thrashes with apps open
+- Stale “16 GiB box” wording in `src/safe/staged.rs` module doc
 
 ### Verified
 - `llama_speed` baseline (2026-09-09, release, mmap, apps open): **tg 0.045 tok/s, TTFT 16.4 s, one pass ≈12 min** vs criterion's ~10 h estimate for the same 27B (`docs/BENCHMARKS.md`)

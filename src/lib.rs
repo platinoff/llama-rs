@@ -19,8 +19,8 @@ mod safe;
 pub use error::{Error, Result};
 pub use metrics::InferenceMetrics;
 pub use safe::{
-    context_presets, generate, generate_stream, l2_norm, l2_normalize, mean_pool, Backend, Context,
-    GenerateOptions, GenerateOptionsBuilder, Model, StagedLoadOptions,
+    context_presets, generate, generate_stream, l2_norm, l2_normalize, mean_pool, preflight,
+    Backend, Context, GenerateOptions, GenerateOptionsBuilder, Model, StagedLoadOptions,
 };
 #[cfg(feature = "embeddings")]
 pub use safe::{embed, embed_normalized};

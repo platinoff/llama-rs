@@ -33,6 +33,7 @@ required-features = ["metrics"]
 clap = { version = "4.3", features = ["derive"] }
 encoding_rs = "0.8"
 llama-cpp-2 = { version = "0.1", features = ["sampler"] }
+sysinfo = "0.38.4"
 thiserror = "2.0"
 
 [dev-dependencies]

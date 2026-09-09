@@ -24,9 +24,22 @@ You get the actual values from a [Context](crate::Context) with [Context::n_ctx]
 ## Presets (implemented in `src/safe/context.rs:196`)
 
 - **Low memory:** `llama_rs::context_presets::low_memory()` → `n_ctx=2048, n_batch=512` (small KV cache, fits 7.4 GiB box + 27B mmap).
+- **CPU low RAM:** `llama_rs::context_presets::cpu_low_ram()` → same `n_ctx=2048, n_batch=512`, documented for < 8 GiB boxes. Pair the load mode with `llama_rs::preflight::{low_ram_staged, warnings}`.
 - **Max speed (prefill):** `llama_rs::context_presets::max_speed()` → `n_ctx=4096, n_batch=2048` (batch≈ctx, fewer prefill steps).
 
 Configure via [ContextParams](crate::ContextParams) (`LlamaContextParams::with_n_ctx`/`with_n_batch`) when creating the context; presets are pure Rust helpers, defaults via upstream.
+
+## RAM preflight (`llama_rs::preflight`, `src/safe/preflight.rs`)
+
+Before loading, compare free RAM against the model file size and pick/suggest a load mode:
+
+- `preflight::free_ram_mib()` — free RAM via `sysinfo` (MiB).
+- `preflight::model_file_mib(path)` — GGUF size from `fs::metadata` (MiB).
+- `preflight::advise(free_mib, model_mib, &staged)` → pure decision: `PreferResident` (mmap and `free >= model + 1024 MiB` headroom), `KeepMmap{deficit_mib}` (free below model → refault risk), `FallbackToMmap` (resident requested but doesn't fit), or `Ok`.
+- `preflight::low_ram_staged(free_mib, model_mib)` → `resident` when it fits, else `mmap`.
+- `preflight::warnings(free, model, &staged)` → human-readable strings (`llama_speed` prints them to stderr unless `--skip-preflight`).
+
+This is the Phase 2 guardrail from `docs/PERFORMANCE_RESEARCH.md`: the 7.4 GiB box with apps open thrashes at 0.045 tok/s because mmap weight pages refault; resident fits only with heavy apps closed.
 
 ## Staged model loading (disk → RAM ступенями)
 

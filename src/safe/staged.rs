@@ -2,7 +2,7 @@
 //!
 //! Controls how GGUF is brought from storage to RAM via `llama-cpp-2`:
 //! - `use_mmap = true` (default) — file stays on disk, pages faulted on demand (mmap). Lets a 27B
-//!   model (≈6.9 GiB mapped) run on a 16 GiB box with ~0.6 GiB free.
+//!   model (≈6.9 GiB mapped) run on a 7.4 GiB box with apps closed / thin free RAM (thrash risk).
 //! - `use_mmap = false` — read fully into RAM (slower start, more resident).
 //! - `use_mlock = true` — pin pages into RAM (mlock), avoids swapping but needs privilege / RAM.
 //! - `progress_callback` — `FnMut(f32) -> bool` with `p in 0.0..=1.0`; returning `false` aborts.

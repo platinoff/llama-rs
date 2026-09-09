@@ -200,6 +200,17 @@ pub mod presets {
             .with_n_batch(512)
     }
 
+    /// CPU low-RAM preset: same modest context as [`low_memory`], documented for
+    /// < 8 GiB boxes. Pair with `preflight::low_ram_staged()` (or
+    /// `crate::preflight::warnings`) to pick `resident` vs `mmap` load mode; see
+    /// `docs/PERFORMANCE_RESEARCH.md` Phase 2.
+    #[must_use]
+    pub fn cpu_low_ram() -> ContextParams {
+        ContextParams::default()
+            .with_n_ctx(NonZeroU32::new(2048))
+            .with_n_batch(512)
+    }
+
     /// Max-speed preset: `n_ctx=4096`, `n_batch=2048` (prefill in fewer steps).
     #[must_use]
     pub fn max_speed() -> ContextParams {
@@ -227,6 +238,13 @@ mod preset_tests {
         let p = presets::max_speed();
         assert_eq!(p.n_ctx(), NonZeroU32::new(4096));
         assert_eq!(p.n_batch(), 2048);
+    }
+
+    #[test]
+    fn cpu_low_ram_preset() {
+        let p = presets::cpu_low_ram();
+        assert_eq!(p.n_ctx(), NonZeroU32::new(2048));
+        assert_eq!(p.n_batch(), 512);
     }
 }
 

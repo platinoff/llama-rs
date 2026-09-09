@@ -17,5 +17,6 @@ pub use embed::{l2_norm, l2_normalize, mean_pool};
 pub use generate::{generate, generate_stream};
 #[cfg(feature = "metrics")]
 pub use generate::{generate_stream_with_metrics, generate_with_metrics};
+pub mod preflight;
 pub use model::Model;
 pub use staged::StagedLoadOptions;

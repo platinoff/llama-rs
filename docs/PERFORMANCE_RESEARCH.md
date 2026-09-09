@@ -90,6 +90,15 @@ count (default 32), then prints `InferenceMetrics::to_json()`.
 - Add a `cpu_low_ram` preset: `resident` load + `n_ctx 2048` + `n_batch 512`
   (vs current `mmap` default on 7.4 GB with apps open).
 - Optional: set `n_batch 2048` for prefill (`max_speed` preset).
+- **Implemented 2026-09-09** (`src/safe/preflight.rs`): `advise(free_mib,
+  model_mib, &staged)` → `PreferResident` when mmap & free ≥ model + 1024 MiB
+  headroom, `KeepMmap{deficit_mib}` when free < model (refault risk),
+  `FallbackToMmap` when resident requested but doesn't fit; `low_ram_staged()`
+  picks `resident` vs `mmap`; `warnings()` → human text. Free RAM via `sysinfo`
+  0.38 (safe), model size via `fs::metadata`. `context_presets::cpu_low_ram()`
+  = `n_ctx 2048`/`n_batch 512`. `llama_speed` gets `--skip-preflight`
+  (warnings print to stderr by default; `src/bin/llama_speed.rs`). Doc'd in
+  `docs/SIZING.md` "RAM preflight". 9 unit tests.
 
 ### Phase 3 — model-path recommendation (docs + optional helper)
 

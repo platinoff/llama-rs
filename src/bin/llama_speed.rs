@@ -17,7 +17,7 @@
 //! Model also resolves from `$LLAMA_RS_BENCH_MODEL` when `--model` is absent.
 
 use clap::Parser;
-use llama_rs::{Backend, ContextParams, GenerateOptions, Model, StagedLoadOptions};
+use llama_rs::{preflight, Backend, ContextParams, GenerateOptions, Model, StagedLoadOptions};
 use std::path::Path;
 
 #[derive(Parser, Debug)]
@@ -63,6 +63,10 @@ struct Args {
     /// Show staged load progress on stderr.
     #[arg(long, default_value_t = false)]
     progress: bool,
+
+    /// Skip the free-RAM vs model-size preflight warnings.
+    #[arg(long, default_value_t = false)]
+    skip_preflight: bool,
 
     /// Print only one JSON line (metrics + load config) instead of the summary.
     #[arg(long, default_value_t = false)]
@@ -123,6 +127,15 @@ fn run(args: Args) -> i32 {
     let staged = StagedLoadOptions::new()
         .with_mmap(use_mmap)
         .with_mlock(args.mlock);
+    if !args.skip_preflight {
+        for w in preflight::warnings(
+            preflight::free_ram_mib(),
+            preflight::model_file_mib(path),
+            &staged,
+        ) {
+            eprintln!("{w}");
+        }
+    }
     let model = if args.progress {
         let mut last_pct = 0u32;
         match Model::load_staged_with_progress(&backend, path, staged, &mut |p: f32| {
