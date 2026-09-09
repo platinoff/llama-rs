@@ -24,6 +24,11 @@ path = "src/lib.rs"
 name = "llama_rs"
 path = "src/main.rs"
 
+[[bin]]
+name = "llama_speed"
+path = "src/bin/llama_speed.rs"
+required-features = ["metrics"]
+
 [dependencies]
 clap = { version = "4.3", features = ["derive"] }
 encoding_rs = "0.8"

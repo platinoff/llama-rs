@@ -23,7 +23,7 @@ You get the actual values from a [Context](crate::Context) with [Context::n_ctx]
 
 ## Presets (implemented in `src/safe/context.rs:196`)
 
-- **Low memory:** `llama_rs::context_presets::low_memory()` → `n_ctx=2048, n_batch=512` (small KV cache, fits 16 GiB + 27B mmap).
+- **Low memory:** `llama_rs::context_presets::low_memory()` → `n_ctx=2048, n_batch=512` (small KV cache, fits 7.4 GiB box + 27B mmap).
 - **Max speed (prefill):** `llama_rs::context_presets::max_speed()` → `n_ctx=4096, n_batch=2048` (batch≈ctx, fewer prefill steps).
 
 Configure via [ContextParams](crate::ContextParams) (`LlamaContextParams::with_n_ctx`/`with_n_batch`) when creating the context; presets are pure Rust helpers, defaults via upstream.
@@ -34,7 +34,7 @@ Controls how the GGUF file is brought to RAM (`StagedLoadOptions` in `src/safe/s
 
 | Mode | `use_mmap` | `use_mlock` | RAM | Start | Use case |
 |------|------------|-------------|-----|-------|----------|
-| **mmap** (default) | true | false | ~0.6 GiB free OK (27B mapped 6.9 GiB, paged) | fast | 5500U 16 GiB, low-RAM — current `BENCHMARKS.md` (0.031 tok/s, 248s TTF) |
+| **mmap** (default) | true | false | ~0.6 GiB free OK (27B mapped 6.9 GiB, paged) | fast | 7.4 GB box, low-RAM — thrashes with apps open (`BENCHMARKS.md`, 0.03 tok/s) |
 | **resident** | false | false | ~8 GiB resident (full read) | slower | Enough RAM, no paging |
 | **pinned** | true | true | pinned (mlock) | fast, no swap | Privilege + RAM, avoids swap |
 

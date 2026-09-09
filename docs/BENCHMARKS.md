@@ -5,8 +5,15 @@
 From the project root (with [build environment](DEVELOPMENT.md#build) set):
 
 ```bash
-cargo bench
+cargo bench                                  # criterion (hello_llama_rust baseline)
+cargo run --bin llama_speed --features metrics -- \
+  --model models/Qwen3.8-27B-UD-IQ2_XXS.gguf --json     # fast one-pass pp/tg/TTFT
 ```
+
+`llama_speed` (`src/bin/llama_speed.rs`, Phase 1 of `PERFORMANCE_RESEARCH.md`) is
+the preferred speed tool: one pass, minutes not hours, JSON line for GSV ingest.
+Model also resolves from `LLAMA_RS_BENCH_MODEL`. Flags: `--gen-tokens`, `--n-ctx`,
+`--n-batch`, `--threads`, `--mmap/--no-mmap`, `--mlock`, `--progress`.
 
 ## Current benchmarks (llama-bench style: pp/tg/TTFT)
 
@@ -23,8 +30,10 @@ All three share one `Backend+Model` (Backend::init once per process). Swap model
 
 ## Results (2026-08-30 — Qwen, 2026-09-01 — expanded metrics)
 
-Hardware: AMD Ryzen 5 5500U (6c/12t), 16 GB RAM (≈0.6 GiB free during run),
-Windows 10, release profile, `n_ctx_default = 512`.
+Hardware: AMD Ryzen 5 5500U (6c/12t), **7.4 GB RAM** (≈0.3–0.6 GiB free during
+run), Windows 10, release profile, `n_ctx_default = 512`. See
+[PERFORMANCE_RESEARCH.md](PERFORMANCE_RESEARCH.md) for the root-cause analysis
+of the ~30× gap vs theoretical (~1 tok/s for dense 27B) and the Rust plan.
 
 Model Qwen: `models/Qwen3.8-27B-UD-IQ2_XXS.gguf` (27B Gated Delta Net / M-RoPE,
 threads = physical cores, `use_mmap true`).
@@ -43,6 +52,24 @@ Run: `LLAMA_RS_BENCH_MODEL=models/Qwen3.8-27B-UD-IQ2_XXS.gguf cargo bench
 > 27B IQ2_XXS model with mmap on a 5500U. Expect seconds-scale numbers only
 > with a smaller / quantized model or a GPU. Memory pressure (≈0.6 GiB free)
 > throttles the run heavily. For Nemotron 30B-A3B expect similar or slower CPU numbers; on GPU `tg` scales with VRAM bandwidth (see web research: RTX 4090 ~125 tok/s for 7B Q4).
+
+### Results (2026-09-09 — `llama_speed` baseline, one pass)
+
+Run: `cargo run --release --bin llama_speed --features metrics -- \
+  --model models/Qwen3.8-27B-UD-IQ2_XXS.gguf --gen-tokens 32 --json`
+(start free RAM 3.0 GiB → thrashed to 0.23 GiB). ~12 min one-pass, the same
+order as the multi-hour criterion run (see `PERFORMANCE_RESEARCH.md`).
+
+```json
+{"pp_tokens":1,"pp_tokens_per_sec":0.061,"tg_tokens":32,"tg_tokens_per_sec":0.045,"ttft_ms":16402,"prompt_ms":16394,"eval_ms":709495,"wall_time_ms":725889,"decode_count":33,"model":"models/Qwen3.8-27B-UD-IQ2_XXS.gguf","use_mmap":true,"use_mlock":false}
+```
+
+| Benchmark | Value | Notes |
+|---|---|---|
+| `tg` (decode) | **0.045 tok/s** (32 tokens / 709.5 s) | same thrash order as criterion 0.031–0.036; ~20–25× below the ~1 tok/s dense-27B theoretical |
+| `ttft` | **16.4 s** | prompt was 1 token |
+| `pp` | n/a (1-token prompt) | use a real prompt text for prefill numbers |
+| wall | 725.9 s | ≈ **12 min one pass** vs criterion's ~10 h estimate |
 
 ## Verification
 
