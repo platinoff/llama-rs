@@ -18,9 +18,10 @@ concrete Rust plan.
    `n_batch`/`n_threads`, generation metrics). The real *missing* Rust pieces are
    a **fast single-pass bench bin** and a **RAM preflight warning** — not new
    inference features.
-3. **Model path is the strongest lever:** a MoE model (`Qwen3-30B-A3B` IQ2,
-   `Qwen3-8B-A3B` Q4) decodes ~5–10× faster than a dense 27B at the same file
-   size. `qwen3moe` arch is already supported by the bundled llama.cpp.
+3. **Model swap is rejected by the owner** (keep Qwen3.8-27B — best capability;
+   the 3.8 family has no mid-size MoE). The speed path is **MTP speculative
+   decoding** (lossless; llama-cpp-2 exposes `MtpSpeculative`) + a **clean-RAM
+   operation** — not a dumber model.
 
 ## Root cause: memory thrash, not compute
 
@@ -119,6 +120,27 @@ Per-token reads for A3B at ~2.2 bpw ≈ 0.9 GB vs ~2.4 GB for current dense IQ2 
 RAM bandwidth no longer melts the machine. Reference: same-machine dense-vs-MoE
 measurement (M4 Max): Qwen3.6-27B q4 = 16.6 t/s vs Qwen3.6-35B-A3B iq4 = 45.1
 t/s (batiai/Qwen3.8-27B-GGUF card).
+
+### Qwen 3.8 lineup check (2026-09-09) — owner decision: keep 27B
+
+Whole official 3.8 family (QwenLM/Qwen3.8 + HF): **Max** (hosted, ~2.4T,
+vision+video, no weights), **2.4T-A95B** (open, ~95B active, text-only,
+datacenter-grade), **Flash-Next** (open, 180B total = 125B main + 51B n-gram
+emb + 4B MTP, 6B active, 512 experts, `qwen4exp` arch, qwen-community-1.0,
+2026-08-26), and **27B** (dense, Apache-2.0, vision, 2026-08-14 — the model in
+use). FP8 siblings exist for 27B and Flash-Next.
+
+Conclusion for the 7.4 GB box: **the 3.8 family has no mid-size MoE** (3.5/3.6
+kept the A3B band; 3.8 jumps 27B dense → 180B Flash-Next → 2.4T). Flash-Next's
+6B active is fast per token but its file class is ~180B — smallest usable quant
+(IQ1_S/IQ2_M ≈ 35–50 GB) is far beyond this box, and `qwen4exp` needs a
+llama.cpp build whose support is only just landing. The 27B dense read
+(~2.4 GB/token) stays the local ceiling → speed must come from **MTP
+speculative decoding (Phase 4)** + clean-RAM operation, **not** from a 3.8 swap.
+
+MTP-draft GGUFs for 27B already exist on HF (e.g.
+DavidAU/Qwen3.8-27B-Cold-Fusion-GAIN-V1.1-NM-DAU-NEO-MAX-MTP-GGUF); llama-cpp-2
+exposes `MtpSpeculative` in `speculative.rs`.
 
 ## Operational rules (cheap, immediate)
 
