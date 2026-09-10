@@ -25,6 +25,9 @@ pub enum Error {
 
     #[error("token to string: {0}")]
     TokenToString(String),
+
+    #[error("mtp error: {0}")]
+    Mtp(String),
 }
 
 impl From<llama_cpp_2::LlamaCppError> for Error {

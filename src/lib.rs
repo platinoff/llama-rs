@@ -25,7 +25,7 @@ pub use safe::{
 #[cfg(feature = "embeddings")]
 pub use safe::{embed, embed_normalized};
 #[cfg(feature = "metrics")]
-pub use safe::{generate_stream_with_metrics, generate_with_metrics};
+pub use safe::{generate_stream_with_metrics, generate_with_metrics, MtpParams, MtpSession};
 
 /// Default params for loading a model. Re-export of [llama_cpp_2::model::params::LlamaModelParams].
 pub type ModelParams = llama_cpp_2::model::params::LlamaModelParams;

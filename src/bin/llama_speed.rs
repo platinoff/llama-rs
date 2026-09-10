@@ -18,6 +18,8 @@
 
 use clap::Parser;
 use llama_rs::{preflight, Backend, ContextParams, GenerateOptions, Model, StagedLoadOptions};
+#[cfg(feature = "metrics")]
+use llama_rs::{MtpParams, MtpSession};
 use std::path::Path;
 
 #[derive(Parser, Debug)]
@@ -71,6 +73,10 @@ struct Args {
     /// Print only one JSON line (metrics + load config) instead of the summary.
     #[arg(long, default_value_t = false)]
     json: bool,
+
+    /// Path to a draft GGUF for MTP speculative decoding (requires --model too).
+    #[arg(long)]
+    draft: Option<String>,
 }
 
 /// One-line JSON of metrics + load config (GSV live ingest shape).
@@ -169,13 +175,6 @@ fn run(args: Args) -> i32 {
         Some(threads) if threads > 0 => ctx_params.with_n_threads(threads),
         _ => ctx_params,
     };
-    let mut context = match model.new_context(&backend, ctx_params) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("error: failed to create context: {}", e);
-            return 1;
-        }
-    };
 
     let opts = GenerateOptions::builder()
         .max_tokens(args.gen_tokens)
@@ -184,41 +183,148 @@ fn run(args: Args) -> i32 {
         .stop_at_eos(false)
         .build();
 
-    match llama_rs::generate_with_metrics(&model, &mut context, &args.prompt, &opts) {
-        Ok((_out, m)) => {
-            if args.json {
-                println!("{}", json_line(&m, &model_arg, use_mmap, args.mlock));
-            } else {
-                println!(
-                    "model : {} (mmap={}, mlock={})",
-                    model_arg, use_mmap, args.mlock
-                );
-                println!(
-                    "pp    : {} tokens in {} ms -> {:.3} tok/s",
-                    m.prompt_tokens,
-                    m.prompt_ms,
-                    m.prompt_tokens_per_sec()
-                );
-                println!(
-                    "tg    : {} tokens in {} ms -> {:.3} tok/s",
-                    m.tokens_generated,
-                    m.eval_ms,
-                    m.tokens_per_sec()
-                );
-                println!(
-                    "ttft  : {} ms",
-                    m.ttft_ms.map_or("n/a".to_string(), |v| v.to_string())
-                );
-                println!(
-                    "wall  : {} ms (decode_count={})",
-                    m.wall_time_ms, m.decode_count
-                );
-            }
-            0
+    if let Some(draft_path_str) = &args.draft {
+        // MTP speculative path: MtpSession creates both target and draft contexts.
+        let draft_path = Path::new(draft_path_str);
+        if !draft_path.exists() {
+            eprintln!("error: draft model not found: {}", draft_path.display());
+            return 2;
         }
-        Err(e) => {
-            eprintln!("error: generation failed: {}", e);
-            1
+        let draft_model = match Model::load_staged(
+            &backend,
+            draft_path,
+            StagedLoadOptions::new()
+                .with_mmap(use_mmap)
+                .with_mlock(args.mlock),
+            None::<fn(f32) -> bool>,
+        ) {
+            Ok(m) => m,
+            Err(e) => {
+                eprintln!("error: failed to load draft model: {}", e);
+                return 1;
+            }
+        };
+        let draft_ctx_params = ContextParams::default()
+            .with_n_ctx(std::num::NonZeroU32::new(args.n_ctx))
+            .with_n_batch(args.n_batch);
+        let draft_ctx_params = match args.threads {
+            Some(threads) if threads > 0 => draft_ctx_params.with_n_threads(threads),
+            _ => draft_ctx_params,
+        };
+        let mtp_params = MtpParams::default();
+        let mut session = match MtpSession::new(
+            &backend,
+            &model,
+            &draft_model,
+            ctx_params,
+            draft_ctx_params,
+            mtp_params,
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("error: failed to create MTP session: {}", e);
+                return 1;
+            }
+        };
+        let mut metrics_out = llama_rs::InferenceMetrics::default();
+        match session.generate(
+            &model,
+            &args.prompt,
+            &opts,
+            Some(&mut |chunk: &str| {
+                if !args.json {
+                    eprint!("{chunk}");
+                }
+            }),
+            Some(&mut metrics_out),
+        ) {
+            Ok(_out) => {
+                if args.json {
+                    println!(
+                        "{}",
+                        json_line(&metrics_out, &model_arg, use_mmap, args.mlock)
+                    );
+                } else {
+                    eprintln!();
+                    println!(
+                        "model : {} (mmap={}, mlock={}) [MTP draft={}]",
+                        model_arg, use_mmap, args.mlock, draft_path_str
+                    );
+                    println!(
+                        "pp    : {} tokens in {} ms -> {:.3} tok/s",
+                        metrics_out.prompt_tokens,
+                        metrics_out.prompt_ms,
+                        metrics_out.prompt_tokens_per_sec()
+                    );
+                    println!(
+                        "tg    : {} tokens in {} ms -> {:.3} tok/s",
+                        metrics_out.tokens_generated,
+                        metrics_out.eval_ms,
+                        metrics_out.tokens_per_sec()
+                    );
+                    println!(
+                        "ttft  : {} ms",
+                        metrics_out
+                            .ttft_ms
+                            .map_or("n/a".to_string(), |v| v.to_string())
+                    );
+                    println!(
+                        "wall  : {} ms (decode_count={})",
+                        metrics_out.wall_time_ms, metrics_out.decode_count
+                    );
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("error: MTP generation failed: {}", e);
+                1
+            }
+        }
+    } else {
+        // Standard (non-speculative) path.
+        let mut context = match model.new_context(&backend, ctx_params) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("error: failed to create context: {}", e);
+                return 1;
+            }
+        };
+        match llama_rs::generate_with_metrics(&model, &mut context, &args.prompt, &opts) {
+            Ok((_out, m)) => {
+                if args.json {
+                    println!("{}", json_line(&m, &model_arg, use_mmap, args.mlock));
+                } else {
+                    println!(
+                        "model : {} (mmap={}, mlock={})",
+                        model_arg, use_mmap, args.mlock
+                    );
+                    println!(
+                        "pp    : {} tokens in {} ms -> {:.3} tok/s",
+                        m.prompt_tokens,
+                        m.prompt_ms,
+                        m.prompt_tokens_per_sec()
+                    );
+                    println!(
+                        "tg    : {} tokens in {} ms -> {:.3} tok/s",
+                        m.tokens_generated,
+                        m.eval_ms,
+                        m.tokens_per_sec()
+                    );
+                    println!(
+                        "ttft  : {} ms",
+                        m.ttft_ms.map_or("n/a".to_string(), |v| v.to_string())
+                    );
+                    println!(
+                        "wall  : {} ms (decode_count={})",
+                        m.wall_time_ms, m.decode_count
+                    );
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("error: generation failed: {}", e);
+                1
+            }
         }
     }
 }

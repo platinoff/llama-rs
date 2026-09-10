@@ -14,8 +14,12 @@ All notable changes to `llama_rs` (pure Rust, `llama-cpp-2` backend).
 - RAM facts corrected to **7.4 GB** total (was “16 GB”) in `docs/BENCHMARKS.md:26` and `docs/SIZING.md:26,37`; mmap thrashes with apps open
 - Stale “16 GiB box” wording in `src/safe/staged.rs` module doc
 
+- **MTP speculative decoding** (`src/safe/mtp.rs`, Phase 4): `MtpSpeculative`-backed `MtpSession` wrapping target+draft contexts, greedy-verify loop (`greedy_at`, `decode_and_process`), `kv_cache_seq_rm` rollback, `accept()` gated on non-empty drafts; `--draft <path>` flag in `llama_speed`; `Error::Mtp(String)` variant; module wired via `mod mtp` + re-exports in `safe/mod.rs` and `lib.rs` (feature `metrics`); `MtpParams` builder (`n_max`/`n_min`/`p_min`); 0 clippy warnings, all 49 tests pass
+- RAM budget: target (6.9 GiB) + draft (3.0 GiB) + two contexts (~1 GiB) ≈ 11 GiB — requires ≥ 16 GiB free RAM; `llama_speed --draft` segfaults on 7.4 GiB boxes (known hardware limitation, not a code bug)
+
 ### Verified
 - `llama_speed` baseline (2026-09-09, release, mmap, apps open): **tg 0.045 tok/s, TTFT 16.4 s, one pass ≈12 min** vs criterion's ~10 h estimate for the same 27B (`docs/BENCHMARKS.md`)
+- MTP build (2026-09-10): `cargo build --release --features metrics` ✓, `cargo clippy` 0 warnings, 49/49 tests pass; runtime requires > 7.4 GiB RAM (target + draft both in memory)
 
 ## [0.1.0] - 2026-08-31
 
