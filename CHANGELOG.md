@@ -14,12 +14,15 @@ All notable changes to `llama_rs` (pure Rust, `llama-cpp-2` backend).
 - RAM facts corrected to **7.4 GB** total (was “16 GB”) in `docs/BENCHMARKS.md:26` and `docs/SIZING.md:26,37`; mmap thrashes with apps open
 - Stale “16 GiB box” wording in `src/safe/staged.rs` module doc
 
-- **MTP speculative decoding** (`src/safe/mtp.rs`, Phase 4): `MtpSpeculative`-backed `MtpSession` wrapping target+draft contexts, greedy-verify loop (`greedy_at`, `decode_and_process`), `kv_cache_seq_rm` rollback, `accept()` gated on non-empty drafts; `--draft <path>` flag in `llama_speed`; `Error::Mtp(String)` variant; module wired via `mod mtp` + re-exports in `safe/mod.rs` and `lib.rs` (feature `metrics`); `MtpParams` builder (`n_max`/`n_min`/`p_min`); 0 clippy warnings, all 49 tests pass
-- RAM budget: target (6.9 GiB) + draft (3.0 GiB) + two contexts (~1 GiB) ≈ 11 GiB — requires ≥ 16 GiB free RAM; `llama_speed --draft` segfaults on 7.4 GiB boxes (known hardware limitation, not a code bug)
+- **MTP speculative decoding** (`src/safe/mtp.rs`, Phase 4): `MtpSpeculative`-backed `MtpSession` wrapping target+draft contexts, greedy-verify loop (`greedy_at`, `decode_and_process`), `kv_cache_seq_rm` rollback, `accept()` gated on non-empty drafts; `--draft <path>` flag in `llama_speed`; `Error::Mtp(String)` variant; module wired via `mod mtp` + re-exports in `safe/mod.rs` and `lib.rs` (feature `metrics`); `MtpParams` builder (`n_max`/`n_min`/`p_min`); 0 clippy warnings, all 49 tests pass; **first end-to-end run** (2026-09-10, 27B target + MTP head): exit 0, drafts accepted from round 2, `kv_cache_seq_rm` suffix rollback on both contexts after every accept
+- **MTP begin() SIGSEGV fixed**: crash in the `common_speculative_begin` → `mtp_begin::begin()` chain traced to `std::call_once` inside `common_log_main()` being unsafe under `-static-libstdc++` (null `__once_call`); replaced with plain function-local statics (`llama.cpp/common/log.cpp`)
+- **M-RoPE strict-position rollback**: `kv_cache_seq_rm(seq_id, n_past, max)` on the draft context after `draft()` and before the verify decode so `process()` can re-write the draft region (M-RoPE requires strictly increasing KV positions `X < Y`, `llama-batch.cpp`); rejected draft tails are cleared on both contexts at `n_past + n_accept + 1` (mirrors `server-context.cpp` `slot.mem.seq_rm`)
+- **Hybrid-target rollback support**: hybrid models (Qwen3.5: attention + recurrent layers) keep a recurrent-state cache whose partial rollback needs `n_rs_seq` snapshots; the target context now sets `n_rs_seq = n_max` (was default `0`, which made `seq_rm` fail with `PartialSequenceRemovalFailed`)
+- RAM budget: target (6.9 GiB) + draft (3.0 GiB) + two contexts (~1 GiB) ≈ 11 GiB — requires ≥ 16 GiB free RAM (previous "segfaults on 7.4 GiB" wording was the begin()-chain crash, now fixed)
 
 ### Verified
 - `llama_speed` baseline (2026-09-09, release, mmap, apps open): **tg 0.045 tok/s, TTFT 16.4 s, one pass ≈12 min** vs criterion's ~10 h estimate for the same 27B (`docs/BENCHMARKS.md`)
-- MTP build (2026-09-10): `cargo build --release --features metrics` ✓, `cargo clippy` 0 warnings, 49/49 tests pass; runtime requires > 7.4 GiB RAM (target + draft both in memory)
+- MTP build + run (2026-09-10): `cargo build --release --features metrics` ✓, `cargo clippy` 0 warnings, 49/49 tests pass; end-to-end `llama_speed --draft` exits 0 and accepts draft tokens; requires > 7.4 GiB RAM (target + draft both in memory)
 
 ## [0.1.0] - 2026-08-31
 

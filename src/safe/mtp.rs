@@ -22,6 +22,7 @@
 use crate::error::{Error, Result};
 use crate::safe::Model;
 use crate::{ContextParams, InferenceMetrics};
+use llama_cpp_2::context::params::LlamaContextType;
 use llama_cpp_2::context::LlamaContext;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::AddBos;
@@ -113,11 +114,23 @@ impl<'a> MtpSession<'a> {
     ) -> Result<Self> {
         let target_ctx = target
             .inner
-            .new_context(backend.inner(), target_params)
+            .new_context(
+                backend.inner(),
+                // Hybrid targets (e.g. Qwen3.5) keep a recurrent-state cache alongside
+                // the KV cache; partial rollback after MTP accept requires per-seq
+                // snapshots. The reference server sizes this with the draft length.
+                target_params.with_n_rs_seq(spd.n_max.max(0) as u32),
+            )
             .map_err(|e| Error::ContextCreate(e.to_string()))?;
+        // The draft model is an MTP head-only GGUF (only the nextn tensors);
+        // llama.cpp must build just the head graph via `ctx_type = MTP`, else it
+        // tries to resolve the full trunk's tensors (which are not in the file).
         let draft_ctx = draft
             .inner
-            .new_context(backend.inner(), draft_params)
+            .new_context(
+                backend.inner(),
+                draft_params.with_context_type(LlamaContextType::Mtp),
+            )
             .map_err(|e| Error::ContextCreate(e.to_string()))?;
 
         let eos = target.inner.token_eos();
@@ -323,6 +336,19 @@ impl<'a> MtpSession<'a> {
                 .draft(n_past, id_last, &real)
                 .map_err(|e| Error::Mtp(e.to_string()))?;
 
+            // draft() wrote speculative MTP activations for the draft region
+            // (positions n_past..) into the draft-context KV. The verify decode
+            // below re-covers exactly that region from the target's verified
+            // embeddings; M-RoPE forbids decoding positions that do not
+            // strictly advance past the current KV max (X < Y). Roll the draft
+            // region back to n_past so process() can rewrite it.
+            // (mirrors server-context.cpp spec checkpoints: seq_rm at
+            //  ckpt.pos_max + 1 after common_speculative_draft)
+            self.mtp
+                .draft_context_mut()
+                .kv_cache_seq_rm(seq_id, Some(n_past as u32), None)
+                .map_err(|e| Error::Decode(e.to_string()))?;
+
             // Tokens to emit this round (matched drafts + 1 corrected token).
             let mut pending: Vec<LlamaToken> = Vec::new();
             let n_accept: i32;
@@ -411,6 +437,14 @@ impl<'a> MtpSession<'a> {
             if valid_after <= self.n_ctx {
                 self.mtp
                     .target_context_mut()
+                    .kv_cache_seq_rm(seq_id, Some(valid_after as u32), None)
+                    .map_err(|e| Error::Decode(e.to_string()))?;
+                // The draft context mirrors these positions; clear the
+                // rejected tail there too so the next draft/process cycle
+                // starts from a strictly increasing position.
+                // (mirrors server-context.cpp slot.mem.seq_rm(pos_next, -1))
+                self.mtp
+                    .draft_context_mut()
                     .kv_cache_seq_rm(seq_id, Some(valid_after as u32), None)
                     .map_err(|e| Error::Decode(e.to_string()))?;
             }
