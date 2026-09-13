@@ -63,8 +63,28 @@ static LAN IP.
 
 `poolAI/src/bin/poolai-worker.rs`: `register-remote` → `heartbeat-remote`
 with capabilities (cpu cores, memory) → `pool/join` → poll/complete tasks.
-A future `llama_worker` phone agent repeats this cycle for discovery/health;
-compute stays on ggml RPC.
+`llama_edge` (`src/bin/llama_edge.rs`) runs this cycle for llama shards:
+register needs `origin=telegram_edge` + `role=virtual_node` (join gate) +
+ed25519-signed capability document (`expires_at` required; dev key matches
+poolAI's dev fixture), optional Telegram bind, `ping`/`llama_shard`
+execution with ggml-rpc probe, job-lease renew while running.
+
+Ports on this box: poolAI coordinator `:8091` (`:8080` is llama_serve,
+rebook also sits nearby — recorded 2026-09-13), GSV `:9999`, Telenetis
+`:9800`. Compute stays on ggml RPC.
+
+## Evaluated alternative: enapt/SwarmLLM (Rust) — SKIP as replacement
+
+Single Rust binary, OpenAI+Anthropic+MCP API, E2E encrypted hops
+(X25519+ChaCha20), private/offline (mDNS-only) modes, pipeline+tensor
+parallelism — the privacy answer to plaintext ggml RPC. Rejected for our
+swarm because: (1) no Qwen3.8/GDN-hybrid and no IQ2_XXS in its 12-arch,
+Q4–Q8-only matrix — our 27B will not run; (2) no Android/Termux story, so
+the A54/Redmi cannot join (Linux aarch64 is best-effort: Pi 4 maybe);
+(3) auto-joins the public swarm by default — opposite of offline-first.
+Worth mirroring later: boomerang encrypted pipeline (requester holds first
++ last shard), mDNS pool discovery, per-segment timing diagnostics.
+Evaluated 2026-09-13 (ticket t-1789331506564707000).
 
 ## Browser alternative (not Rust, experiment only)
 

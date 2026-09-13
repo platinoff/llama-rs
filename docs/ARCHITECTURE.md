@@ -46,6 +46,7 @@
 | `safe/rpc.rs`    | RPC coordinator (`parse_endpoint`, `register_servers`; one manual FFI, `rpc` feature). |
 | `metrics.rs`     | InferenceMetrics. |
 | `src/bin/llama_serve.rs` | OpenAI-compat server `:8080` (`/v1/models`, `/v1/chat/completions`, `--rpc`, `--log-file`). |
+| `src/bin/llama_edge.rs` | poolAI edge worker: register (`telegram_edge`+signed doc) → heartbeat → pool/join → poll → complete, job-lease renew; executes `ping`/`llama_shard` (ggml-rpc probe). |
 | `xtask`          | `check/fmt/clippy/test/loc/sizing` + `serve-install` (hidden HKCU autostart, MinGW DLL staging). |
 
 No unsafe/C++ in repo; orchestration is Rust. GSV live is thin glue (optional `GSV_LIVE` → `127.0.0.1:9999`). One manual `extern "C"` (rpc) besides the `llama-cpp-2` dependency.
@@ -60,7 +61,7 @@ No unsafe/C++ in repo; orchestration is Rust. GSV live is thin glue (optional `G
 
 ## Build dependencies
 
-- **Cargo.toml**: `llama-cpp-2` (`sampler`), `clap`, `encoding_rs`, `serde`/`serde_json`, `thiserror`; features `embeddings`, `metrics`, `rpc`. Crate builds/links llama.cpp; `.cargo/config.toml` pins `LIBCLANG_PATH`, `CMAKE`, `static-libstdc++`.
+- **Cargo.toml**: `llama-cpp-2` (`sampler`), `clap`, `encoding_rs`, `serde`/`serde_json`, `ed25519-dalek` + `hex` (edge capability signing, pure Rust), `thiserror`; features `embeddings`, `metrics`, `rpc`. Crate builds/links llama.cpp; `.cargo/config.toml` pins `LIBCLANG_PATH`, `CMAKE`, `static-libstdc++`.
 - No custom `build.rs`; 100% Rust. `cargo xtask` replaces shell where logical. Registry carries 4 `build.rs` patches + MTP `log.cpp` edit + vendored `ggml-rpc` sources (proto-5.0.0 pin, see `docs/DISTRIBUTED.md`).
 
 ## Target platform

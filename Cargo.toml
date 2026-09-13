@@ -29,6 +29,10 @@ name = "llama_rs"
 path = "src/main.rs"
 
 [[bin]]
+name = "llama_edge"
+path = "src/bin/llama_edge.rs"
+
+[[bin]]
 name = "llama_serve"
 path = "src/bin/llama_serve.rs"
 
@@ -39,7 +43,9 @@ required-features = ["metrics"]
 
 [dependencies]
 clap = { version = "4.6", features = ["derive"] }
+ed25519-dalek = "2"
 encoding_rs = "0.8"
+hex = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Pinned to 0.1.154 on purpose: the local registry copies carry 4 build.rs
