@@ -79,18 +79,17 @@ llama-rs-project/
 - [x] `benches/` — speed benchmark (hello); inference metrics documented in `docs/BENCHMARKS.md`.
 - [x] 64-bit exe build verified (release).
 
-### Phase 5 — Rustification & GSV live (pure Rust, no YAML/TOML shells)
+### Phase 5 — Rustification & GSV live (pure Rust, no YAML/TOML shells) — DONE (see ROADMAP Phase 5)
 
-- [ ] **Ratio 95–100% Rust**: keep `gsv-loc-audit --stretch-96` ≥96% (now 99.4%). Replace any needed non-RS file with RS where logical: shell → `cargo xtask` (Rust), config handled in Rust, CI logic in Rust.
-- [ ] **GSV live integration**: support `GSV_LIVE=1` / `http://127.0.0.1:9999` — progress / metrics can be reported to GSV `vision` / `speed` endpoints; `abrakadabra` ticket flow compatible (`PRODUCTS.md` already registered). No Python, no extra daemons — thin Rust glue.
-- [ ] **Speed**: keep `cargo bench --bench speed` for `time_to_first_token` + `tokens_per_sec`; zero-copy paths, no mid-inference allocs.
+- [x] **Ratio 95–100% Rust**: `gsv-loc-audit --stretch-96` 99.46%; shell → `cargo xtask` (Rust); no Python/Java.
+- [x] **GSV live integration**: `GSV_LIVE=1` progress push + heartbeat (`LLAMA_RS_HEARTBEAT=1` → `target/live/llama_heartbeat.json`); `llama_serve` OpenAI-compat `:8080` behind hub `provider=bunke-rock`; hidden autostart via `cargo xtask serve-install`.
+- [x] **Speed**: `cargo bench --bench speed` for `time_to_first_token` + `tokens_per_sec`; zero-copy paths, no mid-inference allocs.
 
-### Phase 6 — Staged model loading (disk → RAM ступенями)
+### Phase 6 — Staged model loading (disk → RAM ступенями) — DONE (see ROADMAP Phase 6)
 
-- [ ] Research `llama_cpp_2::model::params::LlamaModelParams` flags: `use_mmap` / `use_mlock` / `no_alloc` + `with_progress_callback(|p: f32| -> bool)`.
-- [ ] Implement `Model::load_staged` / `StagedLoadOptions` in `src/safe/staged.rs`: stages — `Mmap` (file stays on disk, paged), `Mlock` (pin to RAM), `Prefault` (touch pages), with progress `0.0..1.0` and abort support. Pure Rust orchestration; backend stays `llama-cpp-2`.
-- [ ] CLI: `--mmap/--no-mmap --mlock` + `--progress` flag; `generate` already streams.
-- [ ] Docs + bench: `docs/SIZING.md` loading modes vs RAM, `docs/BENCHMARKS.md` staged times.
+- [x] `LlamaModelParams` flags researched: `use_mmap` / `use_mlock` / `no_alloc` + `with_progress_callback(|p: f32| -> bool)`.
+- [x] `Model::load_staged` / `StagedLoadOptions` in `src/safe/staged.rs` (mmap/mlock/progress+abort); CLI `--mmap/--no-mmap --mlock --progress`.
+- [x] Docs + bench: `docs/SIZING.md`, `docs/BENCHMARKS.md` staged times.
 
 ---
 

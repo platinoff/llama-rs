@@ -9,6 +9,7 @@ mod generate;
 mod model;
 #[cfg(feature = "metrics")]
 mod mtp;
+mod rpc;
 mod staged;
 
 pub use backend::Backend;
@@ -23,4 +24,5 @@ pub use generate::{generate_stream_with_metrics, generate_with_metrics};
 pub use mtp::{MtpParams, MtpSession};
 pub mod preflight;
 pub use model::Model;
+pub use rpc::{parse_endpoint, register_servers};
 pub use staged::StagedLoadOptions;

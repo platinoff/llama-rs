@@ -18,6 +18,16 @@ Step-by-step guide for Rust developers: build, test, benchmarks, git.
 
 ## Build
 
+**Canon (Windows GNU, always):** MSYS2 bash — never PowerShell, never bare
+`cmd`. Bare `cargo run` fails (two binaries: `llama_rs`, `llama_speed`);
+always name the binary. Hidden/logon launches have no ucrt64 on `PATH`, so
+`llama_serve` needs the MinGW DLLs beside the exe (`cargo xtask
+serve-install` stages them).
+
+```bash
+C:\msys64\usr\bin\bash.exe -lc 'export PATH="/c/Users/plati/.cargo/bin:$HOME/.cargo/bin:/ucrt64/bin:/usr/bin:$PATH"; export RUSTUP_TOOLCHAIN="stable-x86_64-pc-windows-gnu"; cd /s/rust/llama-rs && unset CARGO_TARGET_DIR && cargo run --bin llama_rs -- --help'
+```
+
 **Windows (MSVC):** Run the build from a **Developer Command Prompt** so that `link.exe` and the C++ toolchain are on `PATH`. Set `LIBCLANG_PATH` so bindgen finds libclang (e.g. after installing "C++ Clang tools for Windows"):
 
 ```powershell

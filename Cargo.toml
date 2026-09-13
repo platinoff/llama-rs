@@ -2,6 +2,7 @@
 name = "llama_rs"
 version = "0.1.0"
 edition = "2021"
+default-run = "llama_rs"
 description = "llama.rs — Llama in Rust: Rust-native inference API, backend by llama.cpp (staged disk→RAM, GSV live, pure Rust)"
 license = "MIT"
 readme = "README.md"
@@ -15,6 +16,9 @@ exclude = ["models/*.gguf", "target/*", ".llvm/*", ".cmake/*", "llama.cpp-master
 default = []
 embeddings = []
 metrics = []
+# Distributed inference coordinator: links ggml_backend_rpc_add_server.
+# Requires a GGML_RPC=ON sys build (env-forwarded to CMake, no patch).
+rpc = []
 
 [lib]
 name = "llama_rs"
@@ -25,6 +29,10 @@ name = "llama_rs"
 path = "src/main.rs"
 
 [[bin]]
+name = "llama_serve"
+path = "src/bin/llama_serve.rs"
+
+[[bin]]
 name = "llama_speed"
 path = "src/bin/llama_speed.rs"
 required-features = ["metrics"]
@@ -32,10 +40,14 @@ required-features = ["metrics"]
 [dependencies]
 clap = { version = "4.6", features = ["derive"] }
 encoding_rs = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 # Pinned to 0.1.154 on purpose: the local registry copies carry 4 build.rs
 # patches (aarch/discovery, cpp-httplib static link, llama-common-base, import
-# libs) + 1 MTP common/log.cpp edit. Bumping to 0.1.156 requires re-applying
-# all five + the 27B GGUF E2E (docs/HANDOFF_NEW_SESSION.md).
+# libs) + 1 MTP common/log.cpp edit + vendored ggml/src/ggml-rpc/* sources at
+# proto-5.0.0 pin f5b9bd39 (for GGML_RPC=ON builds, see docs/DISTRIBUTED.md).
+# Bumping to 0.1.156 requires re-applying all six + the 27B GGUF E2E
+# (docs/HANDOFF_NEW_SESSION.md).
 llama-cpp-2 = { version = "=0.1.154", features = ["sampler"] }
 sysinfo = "0.39"
 thiserror = "2.0"
