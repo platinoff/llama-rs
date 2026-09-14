@@ -170,6 +170,44 @@ fn spawn_heartbeat(model: String) {
     });
 }
 
+/// One OpenAI message → (role, flattened text) pairs preserving order (the
+/// chat-template input). Empty content is kept — templates need every turn.
+fn messages_to_chat(messages: &serde_json::Value) -> Vec<(String, String)> {
+    let Some(arr) = messages.as_array() else {
+        return Vec::new();
+    };
+    fn content_text(c: &serde_json::Value) -> String {
+        match c {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Array(parts) => parts
+                .iter()
+                .filter_map(|p| {
+                    if p.get("type").and_then(|t| t.as_str()) == Some("text") {
+                        p.get("text").and_then(|t| t.as_str())
+                    } else if p.get("text").is_some() {
+                        p.get("text").and_then(|t| t.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(""),
+            _ => String::new(),
+        }
+    }
+    arr.iter()
+        .map(|m| {
+            (
+                m.get("role")
+                    .and_then(|r| r.as_str())
+                    .unwrap_or("user")
+                    .to_string(),
+                content_text(m.get("content").unwrap_or(&serde_json::Value::Null)),
+            )
+        })
+        .collect()
+}
+
 /// Flatten OpenAI `messages` (string or `[{type:text}]` parts) into one prompt:
 /// system lines first, then the rest in order, joined with newline.
 fn messages_to_prompt(messages: &serde_json::Value) -> String {
@@ -307,6 +345,9 @@ fn respond(stream: &mut std::net::TcpStream, status: u16, reason: &str, ctype: &
 /// `generation failed: …`).
 struct InferenceJob {
     prompt: String,
+    /// OpenAI turns when the request carried `messages[]` (rendered through
+    /// the model's chat template on the worker; empty = raw `prompt`).
+    turns: Vec<(String, String)>,
     max_tokens: u32,
     temperature: f32,
     reply: std::sync::mpsc::Sender<Result<String, String>>,
@@ -328,6 +369,22 @@ impl InferenceWorker {
             let out = match &self.model {
                 None => Err("model not loaded".to_string()),
                 Some(model) => {
+                    // `messages[]` → model chat template (add_generation_prompt).
+                    // No template / render error → honest raw fallback below.
+                    let prompt = if job.turns.is_empty() {
+                        job.prompt.clone()
+                    } else {
+                        match job
+                            .turns
+                            .iter()
+                            .map(|(r, c)| llama_rs::ChatMessage::new(r.clone(), c.clone()))
+                            .collect::<Result<Vec<_>, _>>()
+                            .and_then(|msgs| model.apply_chat_template(&msgs, true))
+                        {
+                            Ok(rendered) => rendered,
+                            Err(_) => job.prompt.clone(),
+                        }
+                    };
                     let mut ctx = match model.new_context(&self.backend, ContextParams::default()) {
                         Ok(c) => c,
                         Err(e) => {
@@ -339,7 +396,7 @@ impl InferenceWorker {
                         .max_tokens(job.max_tokens)
                         .temperature(job.temperature)
                         .build();
-                    match llama_rs::generate(model, &mut ctx, &job.prompt, &opts) {
+                    match llama_rs::generate(model, &mut ctx, &prompt, &opts) {
                         Ok(out) => Ok(out),
                         Err(e) => Err(format!("generation failed: {e}")),
                     }
@@ -466,11 +523,11 @@ impl Server {
                 return;
             }
         };
-        let prompt = if let Some(p) = v.get("prompt").and_then(|p| p.as_str()) {
-            p.to_string()
+        let (prompt, turns) = if let Some(p) = v.get("prompt").and_then(|p| p.as_str()) {
+            (p.to_string(), Vec::new())
         } else {
             match v.get("messages") {
-                Some(m) => messages_to_prompt(m),
+                Some(m) => (messages_to_prompt(m), messages_to_chat(m)),
                 None => {
                     respond(
                         stream,
@@ -483,7 +540,7 @@ impl Server {
                 }
             }
         };
-        if prompt.is_empty() {
+        if prompt.is_empty() && turns.is_empty() {
             respond(
                 stream,
                 400,
@@ -512,6 +569,7 @@ impl Server {
             .jobs
             .send(InferenceJob {
                 prompt: prompt.clone(),
+                turns,
                 max_tokens,
                 temperature,
                 reply: tx,
@@ -778,6 +836,7 @@ mod tests {
         let (reply_tx, reply_rx) = std::sync::mpsc::channel();
         tx.send(InferenceJob {
             prompt: "hi".to_string(),
+            turns: Vec::new(),
             max_tokens: 8,
             temperature: 0.0,
             reply: reply_tx,
@@ -787,6 +846,21 @@ mod tests {
             reply_rx.recv().expect("reply"),
             Err("model not loaded".to_string())
         );
+    }
+
+    #[test]
+    fn messages_to_chat_preserves_order_and_flattens_parts() {
+        let msgs = serde_json::json!([
+            {"role": "system", "content": "You are terse."},
+            {"role": "user", "content": [{"type": "text", "text": "2+2?"}]}
+        ]);
+        let turns = messages_to_chat(&msgs);
+        assert_eq!(turns.len(), 2);
+        assert_eq!(turns[0].0, "system");
+        assert_eq!(turns[0].1, "You are terse.");
+        assert_eq!(turns[1].0, "user");
+        assert_eq!(turns[1].1, "2+2?");
+        assert!(messages_to_chat(&serde_json::json!("nope")).is_empty());
     }
 
     #[test]
