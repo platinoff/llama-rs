@@ -24,3 +24,7 @@ kit-canon entry point (`gsv_products_scan` / GSV `rules-check` registry gate).
   `/v1/models.rpc_workers`); GGML_RPC=ON links clean with vendored
   `ggml-rpc` sources at proto-5.0.0 pin `f5b9bd39` (6th registry addition).
   Plan: Pi 4 `ggml-rpc-server` at the same pin → A54 Termux (docs/DISTRIBUTED.md).
+- **State (2026-09-14)**: ticket drain — chat-template safe API (`src/safe/chat.rs`,
+  c450159) + crates.io prep (examples + `cargo package` clean, 57f558b). Board:
+  bump `llama-cpp-2 -> 0.1.156` left **open** (re-apply 6 registry patches + full
+  rebuild + serve downtime); swarm band stays blocked on Pi 4 / A54 hardware.
