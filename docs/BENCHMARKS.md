@@ -79,6 +79,18 @@ Serve: release `llama_serve` + `models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf`
 27B mmap rate (0.031 tok/s, TTF 248 s). This is the fast tier for the
 chat loop; 27B stays the deep tier (see `docs/DISTRIBUTED.md` tiers).
 
+### Results (2026-09-14 — chat loop laptop↔A54 via channels)
+
+Full loop Mini App/bot → poolAI task → `llama_edge` → `llama_serve` →
+answer back (`max_tokens=8`, same prompt):
+
+| Tier | Wall E2E | Notes |
+|---|---|---|
+| Fast (`lama-1.5` :8082) | **15.3 s** | poll-granularity bound; inference itself ~4 s |
+| Deep (`lama-2.8` :8080) | **270.8 s** | ~0.03 tok/s effective, matches direct-serve baseline |
+
+Phone needs nothing but Telegram (initData-gated enqueue).
+
 ## Verification
 
 Qwen locally (default):
