@@ -10,7 +10,7 @@
 //! ggml-rpc-server (see `docs/DISTRIBUTED.md`).
 //!
 //! ```text
-//! cargo run --bin llama_edge -- --coordinator http://127.0.0.1:8091 \
+//! cargo run --bin llama_edge -- --coordinator http://<this-pc-lan-ip>:8091 \
 //!   --worker-id edge-test-01 --rpc-endpoint 192.168.1.10:50052 \
 //!   --telegram-id 999001
 //! ```
@@ -60,15 +60,19 @@ fn slog(msg: &str) {
 #[command(about = "llama shard edge worker for the poolAI coordinator")]
 struct Args {
     /// Coordinator base URL (poolAI serves :8091 here; :8080 is llama_serve).
-    #[arg(long, default_value = "http://127.0.0.1:8091")]
+    /// Band 233: defaults to this machine's local address, not `127.0.0.1` —
+    /// same-box VMs reach the host; remote edges pass an explicit URL.
+    #[arg(long, default_value_os_t = default_coordinator())]
     coordinator: String,
 
     /// Worker peer id (must match poolAI worker-id rules).
     #[arg(long, default_value = "llama-edge-01")]
     worker_id: String,
 
-    /// This worker's ggml-rpc-server endpoint to advertise + probe.
-    #[arg(long, default_value = "127.0.0.1:50052")]
+    /// This worker's ggml-rpc-server endpoint to advertise + probe
+    /// (band 233: advertised on the local address so the coordinator can
+    /// actually route shards here).
+    #[arg(long, default_value_os_t = default_rpc_endpoint())]
     rpc_endpoint: String,
 
     /// Optional Telegram user id: bound to this peer after register.
@@ -146,7 +150,17 @@ fn serve_url() -> String {
     std::env::var("LLAMA_SERVE_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "http://127.0.0.1:8080".to_string())
+        .unwrap_or_else(|| llama_rs::net::http_base(8080))
+}
+
+/// Band 233 defaults: coordinator and advertised rpc endpoint sit on this
+/// machine's local address (`GSV_LOCAL_ADDR` override wins), never `127.0.0.1`.
+fn default_coordinator() -> String {
+    llama_rs::net::http_base(8091)
+}
+
+fn default_rpc_endpoint() -> String {
+    format!("{}:50052", llama_rs::net::local_addr())
 }
 
 /// Minimal blocking HTTP: returns (status_code, body). Follows the same
@@ -353,7 +367,7 @@ fn join_once(
         "/api/v1/discovery/register-remote",
         &serde_json::json!({
             "peer_id": peer,
-            "address": "127.0.0.1",
+            "address": llama_rs::net::local_addr(),
             "port": 0,
             "capabilities": {
                 "cpu_cores": cpu_cores(),
@@ -500,7 +514,7 @@ pub fn serve_endpoint(tier: &str) -> (String, String) {
         let base = std::env::var("LLAMA_SERVE_FAST_URL")
             .ok()
             .filter(|s| !s.trim().is_empty())
-            .unwrap_or_else(|| "http://127.0.0.1:8082".to_string());
+            .unwrap_or_else(|| llama_rs::net::http_base(8082));
         (base, "lama-1.5".to_string())
     } else {
         (serve_url(), "lama-2.8".to_string())

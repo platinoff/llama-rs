@@ -14,6 +14,7 @@
 
 mod error;
 mod metrics;
+pub mod net;
 mod safe;
 
 pub use error::{Error, Result};

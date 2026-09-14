@@ -1,11 +1,13 @@
 //! `llama_serve` — OpenAI-compatible HTTP server for llama-rs (BunkeRock).
 //!
-//! Serves the GGUF loaded by llama-rs on `127.0.0.1:8080` with `/v1` routes so
+//! Serves the GGUF loaded by llama-rs on `:8080` (band 233: bind default
+//! `0.0.0.0` — all local interfaces; peers address it via the machine's
+//! local LAN address, e.g. `http://<lan-ip>:8080/v1`) with `/v1` routes so
 //! the GSV OmniRouter hub (`POST /api/omni/v1/chat/completions`,
-//! `provider=bunke-rock`, base `http://127.0.0.1:8080/v1`) has a live upstream,
+//! `provider=bunke-rock`) has a live upstream,
 //! and Cursor / OpenCode can point at the hub instead of the bare port.
 //!
-//! Routes (all local, no auth):
+//! Routes (no auth — do not expose beyond the trusted LAN without a proxy):
 //! - `GET /v1/models` (alias `GET /models`, `GET /health`) — model list
 //! - `POST /v1/chat/completions` (alias `POST /chat/completions`) — chat
 //!   (`{"model","messages":[{"role","content"}],"max_tokens","temperature","stream"}`;
@@ -76,8 +78,10 @@ struct Args {
     #[arg(index = 1)]
     model: Option<String>,
 
-    /// Bind host (default 127.0.0.1, local only).
-    #[arg(long, default_value = "127.0.0.1")]
+    /// Bind host (band 233: default 0.0.0.0 — every local interface, so GSV
+    /// omni, VM and edge peers reach :8080/:8082 by the machine's local
+    /// address; pass --host for a concrete single-interface bind).
+    #[arg(long, default_value = "0.0.0.0")]
     host: String,
 
     /// Bind port (BunkeRock canon is 8080).

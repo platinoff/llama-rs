@@ -13,12 +13,16 @@ use std::io::Write as _;
 use std::path::Path;
 use std::time::Duration;
 
-/// Best-effort push of staged progress to GSV live (`GSV_LIVE=1` → `127.0.0.1:9999`).
+/// Best-effort push of staged progress to GSV live (`GSV_LIVE=1` →
+/// `GSV_LIVE_URL`, band 233 default = this machine's local address on
+/// `:9999`, not `127.0.0.1`, so VM / edge sessions land on the host GSV).
 /// Pure Rust std only, no extra deps, 150ms timeout, ignore errors.
 fn gsv_report_progress(p: f32) {
     if std::env::var_os("GSV_LIVE").is_none() {
         return;
     }
+    let url = llama_rs::net::gsv_live_url();
+    let authority = llama_rs::net::url_authority(&url);
     let body = format!(
         r#"{{"staged_progress":{:.3},"ts":{}}}"#,
         p,
@@ -28,14 +32,11 @@ fn gsv_report_progress(p: f32) {
             .unwrap_or(0)
     );
     let req = format!(
-        "POST /api/ingest HTTP/1.1\r\nHost: 127.0.0.1:9999\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        "POST /api/ingest HTTP/1.1\r\nHost: {authority}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
         body.len(),
         body
     );
-    if let Ok(mut s) = std::net::TcpStream::connect_timeout(
-        &std::net::SocketAddr::from(([127, 0, 0, 1], 9999)),
-        Duration::from_millis(120),
-    ) {
+    if let Some(mut s) = llama_rs::net::connect_authority(&url, Duration::from_millis(120)) {
         let _ = s.set_write_timeout(Some(Duration::from_millis(80)));
         let _ = s.write_all(req.as_bytes());
     }

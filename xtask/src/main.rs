@@ -41,7 +41,7 @@ Examples:
   cargo xtask test
   cargo xtask serve-install
   cargo xtask serve-install models/Qwen3.8-27B-UD-IQ2_XXS.gguf 8080
-  cargo xtask edge-install edge-pc-01 http://127.0.0.1:8091
+  cargo xtask edge-install edge-pc-01 http://<this-pc-lan-ip>:8091
 "#
     );
 }
@@ -324,10 +324,28 @@ fn edge_task_tr(
     } else {
         worker
     };
+    // Band 233: default coordinator sits on this machine's local address
+    // (`GSV_LOCAL_ADDR` override, else default-route IPv4, else loopback) —
+    // same rule as `llama_rs::net`, re-implemented here because xtask stays
+    // dependency-free.
     let coord = if coord.is_empty() {
-        "http://127.0.0.1:8091"
+        let host = {
+            let from_env = std::env::var("GSV_LOCAL_ADDR")
+                .ok()
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty());
+            from_env.unwrap_or_else(|| {
+                std::net::UdpSocket::bind("0.0.0.0:0")
+                    .ok()
+                    .filter(|s| s.connect("8.8.8.8:53").is_ok())
+                    .and_then(|s| s.local_addr().ok())
+                    .map(|a| a.ip().to_string())
+                    .unwrap_or_else(|| "127.0.0.1".to_string())
+            })
+        };
+        format!("http://{host}:8091")
     } else {
-        coord
+        coord.to_string()
     };
     let log = format!("{win_root}\\target\\live\\llama_edge.log");
     format!(
