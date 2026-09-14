@@ -29,8 +29,10 @@ Tasks:
   test    cargo test
   loc     gsv-loc-audit --stretch-96 (99.46% now)
   sizing  show SIZING.md staged table
-  serve-install [MODEL] [PORT]    persist llama_serve hidden (schtasks ONLOGON, no cmd window)
+  serve-install [MODEL] [PORT] [release|debug]  persist llama_serve hidden (HKCU Run, no cmd window)
   serve-uninstall                 remove the persisted llama_serve task
+  edge-install [WORKER_ID] [COORDINATOR]  persist llama_edge hidden (HKCU Run, no cmd window)
+  edge-uninstall                  remove the persisted llama_edge task
   help    this help
 
 Examples:
@@ -39,6 +41,7 @@ Examples:
   cargo xtask test
   cargo xtask serve-install
   cargo xtask serve-install models/Qwen3.8-27B-UD-IQ2_XXS.gguf 8080
+  cargo xtask edge-install edge-pc-01 http://127.0.0.1:8091
 "#
     );
 }
@@ -108,11 +111,12 @@ fn main() {
             }
         }
         "serve-install" => {
-            // Optional: cargo xtask serve-install [MODEL] [PORT]
+            // Optional: cargo xtask serve-install [MODEL] [PORT] [release|debug]
             let rest: Vec<String> = env::args().skip(2).collect();
             let model = rest.first().map(String::as_str).unwrap_or("");
             let port = rest.get(1).map(String::as_str).unwrap_or("");
-            match serve_install(&repo_root, model, port) {
+            let profile = rest.get(2).map(String::as_str).unwrap_or("");
+            match serve_install(&repo_root, model, port, profile) {
                 Ok(msg) => {
                     println!("{msg}");
                     (true, 0)
@@ -133,6 +137,32 @@ fn main() {
                 (false, 1)
             }
         },
+        "edge-install" => {
+            // Optional: cargo xtask edge-install [WORKER_ID] [COORDINATOR]
+            let rest: Vec<String> = env::args().skip(2).collect();
+            let worker = rest.first().map(String::as_str).unwrap_or("");
+            let coord = rest.get(1).map(String::as_str).unwrap_or("");
+            match edge_install(&repo_root, worker, coord) {
+                Ok(msg) => {
+                    println!("{msg}");
+                    (true, 0)
+                }
+                Err(e) => {
+                    eprintln!("edge-install failed: {e}");
+                    (false, 1)
+                }
+            }
+        }
+        "edge-uninstall" => match edge_uninstall() {
+            Ok(msg) => {
+                println!("{msg}");
+                (true, 0)
+            }
+            Err(e) => {
+                eprintln!("edge-uninstall failed: {e}");
+                (false, 1)
+            }
+        },
         "help" | "--help" | "-h" => {
             help();
             (true, 0)
@@ -148,12 +178,19 @@ fn main() {
     }
 }
 
-/// Find a built `llama_serve` exe (debug first, then release).
-fn serve_exe(repo_root: &std::path::Path) -> Option<std::path::PathBuf> {
-    for dir in [
-        "target/debug/llama_serve.exe",
-        "target/release/llama_serve.exe",
-    ] {
+/// Find a built `llama_serve` exe. `profile` forces release/debug;
+/// otherwise debug first, then release.
+fn serve_exe(repo_root: &std::path::Path, profile: &str) -> Option<std::path::PathBuf> {
+    let mut dirs = Vec::new();
+    if profile == "release" {
+        dirs.push("target/release/llama_serve.exe");
+    } else if profile == "debug" {
+        dirs.push("target/debug/llama_serve.exe");
+    } else {
+        dirs.push("target/debug/llama_serve.exe");
+        dirs.push("target/release/llama_serve.exe");
+    }
+    for dir in dirs {
         let p = repo_root.join(dir);
         if p.is_file() {
             return Some(p);
@@ -226,8 +263,13 @@ fn serve_task_tr(root: &std::path::Path, exe: &std::path::Path, model: &str, por
 
 /// Persist `llama_serve` across reboot (current user, no cmd window).
 /// Prefers schtasks ONLOGON, falls back to HKCU Run (same mirror as GSV watchdog).
-fn serve_install(repo_root: &std::path::Path, model: &str, port: &str) -> Result<String, String> {
-    let exe = serve_exe(repo_root)
+fn serve_install(
+    repo_root: &std::path::Path,
+    model: &str,
+    port: &str,
+    profile: &str,
+) -> Result<String, String> {
+    let exe = serve_exe(repo_root, profile)
         .ok_or_else(|| "no built llama_serve (run: cargo build --bin llama_serve)".to_string())?;
     let dlls = ensure_serve_dlls(&exe)?;
     if !dlls.is_empty() {
@@ -266,6 +308,125 @@ fn serve_uninstall() -> Result<String, String> {
         .map_err(|e| format!("reg: {e}"))?;
     notes.push(format!("hkcu run delete: {}", reg.success()));
     Ok(format!("llama-serve-uninstall: {}", notes.join(", ")))
+}
+
+/// Hidden task command for the edge executor (same zero-window pattern).
+fn edge_task_tr(
+    root: &std::path::Path,
+    exe: &std::path::Path,
+    worker: &str,
+    coord: &str,
+) -> String {
+    let win_root = win_path(root);
+    let win_exe = win_path(exe);
+    let worker = if worker.is_empty() {
+        "edge-pc-01"
+    } else {
+        worker
+    };
+    let coord = if coord.is_empty() {
+        "http://127.0.0.1:8091"
+    } else {
+        coord
+    };
+    let log = format!("{win_root}\\target\\live\\llama_edge.log");
+    format!(
+        "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command \"Start-Process -FilePath '{win_exe}' -ArgumentList '--coordinator','{coord}','--worker-id','{worker}','--log-file','{log}' -WorkingDirectory '{win_root}' -WindowStyle Hidden\""
+    )
+}
+
+/// Persist `llama_edge` across reboot (current user, no cmd window).
+/// Find a built `llama_edge` exe (debug first, then release).
+fn edge_exe(repo_root: &std::path::Path) -> Option<std::path::PathBuf> {
+    for dir in [
+        "target/debug/llama_edge.exe",
+        "target/release/llama_edge.exe",
+    ] {
+        let p = repo_root.join(dir);
+        if p.is_file() {
+            return Some(p);
+        }
+    }
+    None
+}
+
+fn edge_install(repo_root: &std::path::Path, worker: &str, coord: &str) -> Result<String, String> {
+    let exe = edge_exe(repo_root)
+        .ok_or_else(|| "no built llama_edge (run: cargo build --bin llama_edge)".to_string())?;
+    let dlls = ensure_serve_dlls(&exe)?;
+    if !dlls.is_empty() {
+        println!("edge-install: staged runtime DLLs: {}", dlls.join(", "));
+    }
+    let tr = edge_task_tr(repo_root, &exe, worker, coord);
+    if try_schtasks_edge(&tr) {
+        return Ok(format!(
+            "llama-edge-install: schtasks llama-edge (ONLOGON, hidden)\nTR={tr}"
+        ));
+    }
+    if try_hkcu_run_edge(&tr) {
+        return Ok(format!(
+            "llama-edge-install: HKCU Run llama-edge (hidden)\nTR={tr}"
+        ));
+    }
+    Err("could not persist (need schtasks or reg.exe)".into())
+}
+
+fn edge_uninstall() -> Result<String, String> {
+    let mut notes = Vec::new();
+    let st = Command::new(r"C:\Windows\System32\schtasks.exe")
+        .args(["/Delete", "/TN", "llama-edge", "/F"])
+        .status()
+        .map_err(|e| format!("schtasks: {e}"))?;
+    notes.push(format!("schtasks delete: {}", st.success()));
+    let reg = Command::new(r"C:\Windows\System32\reg.exe")
+        .args([
+            "delete",
+            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+            "/v",
+            "llama-edge",
+            "/f",
+        ])
+        .status()
+        .map_err(|e| format!("reg: {e}"))?;
+    notes.push(format!("hkcu run delete: {}", reg.success()));
+    Ok(format!("llama-edge-uninstall: {}", notes.join(", ")))
+}
+
+fn try_schtasks_edge(tr: &str) -> bool {
+    Command::new(r"C:\Windows\System32\schtasks.exe")
+        .args([
+            "/Create",
+            "/TN",
+            "llama-edge",
+            "/SC",
+            "ONLOGON",
+            "/RL",
+            "LIMITED",
+            "/F",
+            "/TR",
+            tr,
+        ])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn try_hkcu_run_edge(tr: &str) -> bool {
+    Command::new(r"C:\Windows\System32\reg.exe")
+        .args([
+            "add",
+            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+            "/v",
+            "llama-edge",
+            "/t",
+            "REG_SZ",
+            "/d",
+            tr,
+            "/f",
+        ])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 fn try_schtasks(tr: &str) -> bool {

@@ -18,8 +18,42 @@
 use clap::Parser;
 use std::io::{Read, Write as _};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
+
+/// File log for hidden runs (same pattern as `llama_serve`).
+static LOG_FILE: OnceLock<Mutex<std::fs::File>> = OnceLock::new();
+
+fn init_log(path: Option<&str>) {
+    if let Some(p) = path {
+        match std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(p)
+        {
+            Ok(f) => {
+                let _ = LOG_FILE.set(Mutex::new(f));
+            }
+            Err(e) => eprintln!("warning: cannot open log file {p}: {e}"),
+        }
+    }
+}
+
+fn slog(msg: &str) {
+    let line = format!(
+        "[{}] {msg}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    );
+    eprintln!("{line}");
+    if let Some(m) = LOG_FILE.get() {
+        if let Ok(mut f) = m.lock() {
+            let _ = writeln!(f, "{line}");
+        }
+    }
+}
 
 #[derive(Parser, Debug)]
 #[command(name = "llama_edge")]
@@ -58,6 +92,10 @@ struct Args {
     /// LLAMA_EDGE_SIGNING_KEY for anything beyond LAN tests).
     #[arg(long)]
     signing_key: Option<String>,
+
+    /// Append log lines to this file too (for hidden runs with no console).
+    #[arg(long)]
+    log_file: Option<String>,
 }
 
 fn signing_key_bytes(args: &Args) -> Result<[u8; 32], String> {
@@ -103,15 +141,29 @@ fn now_secs() -> u64 {
         .unwrap_or(0)
 }
 
+/// llama_serve base URL for `llama_chat` execution.
+fn serve_url() -> String {
+    std::env::var("LLAMA_SERVE_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "http://127.0.0.1:8080".to_string())
+}
+
 /// Minimal blocking HTTP: returns (status_code, body). Follows the same
 /// shape as `llama_serve`'s parser (single response, Connection: close).
-fn http_json(method: &str, url: &str, body: Option<&str>) -> Result<(u16, String), String> {
+/// `timeout_secs` covers connect + full read (chat needs minutes).
+fn http_json(
+    method: &str,
+    url: &str,
+    body: Option<&str>,
+    timeout_secs: u64,
+) -> Result<(u16, String), String> {
     let (host_port, path) = split_url(url)?;
-    let mut stream =
-        std::net::TcpStream::connect_timeout(&parse_addr(&host_port)?, Duration::from_secs(15))
-            .map_err(|e| format!("connect {host_port}: {e}"))?;
+    let timeout = Duration::from_secs(timeout_secs.max(1));
+    let mut stream = std::net::TcpStream::connect_timeout(&parse_addr(&host_port)?, timeout)
+        .map_err(|e| format!("connect {host_port}: {e}"))?;
     stream
-        .set_read_timeout(Some(Duration::from_secs(15)))
+        .set_read_timeout(Some(timeout))
         .map_err(|e| e.to_string())?;
     let len = body.map(str::len).unwrap_or(0);
     let req = format!(
@@ -221,12 +273,12 @@ fn capability_doc(
 
 fn post(coordinator: &str, path: &str, body: &serde_json::Value) -> Result<(u16, String), String> {
     let url = format!("{}{path}", coordinator.trim_end_matches('/'));
-    http_json("POST", &url, Some(&body.to_string()))
+    http_json("POST", &url, Some(&body.to_string()), 15)
 }
 
 fn get(coordinator: &str, path: &str) -> Result<(u16, String), String> {
     let url = format!("{}{path}", coordinator.trim_end_matches('/'));
-    http_json("GET", &url, None)
+    http_json("GET", &url, None, 15)
 }
 
 fn check(status: u16, body: &str, what: &str) -> Result<(), String> {
@@ -242,8 +294,9 @@ fn check(status: u16, body: &str, what: &str) -> Result<(), String> {
 
 fn main() {
     let args = Args::parse();
+    init_log(args.log_file.as_deref());
     if let Err(e) = run(args) {
-        eprintln!("llama_edge error: {e}");
+        slog(&format!("llama_edge error: {e}"));
         std::process::exit(1);
     }
 }
@@ -259,12 +312,44 @@ fn run(args: Args) -> Result<(), String> {
     let coord = args.coordinator.clone();
     let peer = args.worker_id.clone();
 
-    eprintln!("llama_edge {peer} -> {coord} (rpc {})", args.rpc_endpoint);
+    slog(&format!(
+        "llama_edge {peer} -> {coord} (rpc {})",
+        args.rpc_endpoint
+    ));
 
+    // 1–3. register + bind + join (idempotent, re-runs on 404).
+    join_once(&args, &key, &caps, mem_mb, &coord, &peer)?;
+
+    // 4. heartbeat + poll loop. A 404 means the coordinator forgot us
+    // (restart wipes in-memory registrations) — re-join instead of
+    // haunting the loop as a ghost.
+    loop {
+        if !heartbeat_once(&coord, &peer, mem_mb) {
+            slog("heartbeat lost registration; re-joining");
+            if join_once(&args, &key, &caps, mem_mb, &coord, &peer).is_err() {
+                std::thread::sleep(Duration::from_secs(30));
+                continue;
+            }
+        }
+        poll_once(&coord, &peer, &args);
+        std::thread::sleep(Duration::from_secs(args.poll_secs.max(1)));
+    }
+}
+
+/// Register + telegram bind + pool join (steps 1–3). Idempotent: safe to
+/// re-run after the coordinator restarts.
+fn join_once(
+    args: &Args,
+    key: &[u8; 32],
+    caps: &[String],
+    mem_mb: usize,
+    coord: &str,
+    peer: &str,
+) -> Result<(), String> {
     // 1. register-remote (telegram_edge + virtual_node role + signed doc).
-    let doc = capability_doc(&key, &peer, &caps)?;
+    let doc = capability_doc(key, peer, caps)?;
     let (st, body) = post(
-        &coord,
+        coord,
         "/api/v1/discovery/register-remote",
         &serde_json::json!({
             "peer_id": peer,
@@ -287,44 +372,38 @@ fn run(args: Args) -> Result<(), String> {
         }),
     )?;
     check(st, &body, "register-remote")?;
-    eprintln!("registered: {body}");
+    slog(&format!("registered: {body}"));
 
     // 2. optional Telegram bind.
     if let Some(tg) = &args.telegram_id {
         let (st, body) = post(
-            &coord,
+            coord,
             "/api/v1/virtual-nodes/telegram/bind",
             &serde_json::json!({"telegram_user_id": tg, "peer_id": peer}),
         )?;
         check(st, &body, "telegram bind")?;
-        eprintln!("telegram bound: {body}");
+        slog(&format!("telegram bound: {body}"));
     }
 
     // 3. pool/join.
     let (st, body) = post(
-        &coord,
+        coord,
         &format!("/api/v1/virtual-nodes/{peer}/pool/join"),
         &serde_json::json!({"max_memory_mb": mem_mb, "max_concurrent_requests": 4}),
     )?;
     check(st, &body, "pool join").or_else(|e| {
         // 503 = pool not ready yet: stay discovery-only like poolai-worker.
         if e.contains("503") {
-            eprintln!("pool not ready; discovery-only");
+            slog("pool not ready; discovery-only");
             Ok(())
         } else {
             Err(e)
         }
-    })?;
-
-    // 4. heartbeat + poll loop.
-    loop {
-        heartbeat_once(&coord, &peer, mem_mb);
-        poll_once(&coord, &peer, &args);
-        std::thread::sleep(Duration::from_secs(args.poll_secs.max(1)));
-    }
+    })
 }
 
-fn heartbeat_once(coord: &str, peer: &str, mem_mb: usize) {
+/// Returns false when the coordinator forgot us (404) so the caller re-joins.
+fn heartbeat_once(coord: &str, peer: &str, mem_mb: usize) -> bool {
     static mut LAST: u64 = 0;
     let now = now_secs();
     // Heartbeat every ~15s regardless of poll cadence.
@@ -337,7 +416,7 @@ fn heartbeat_once(coord: &str, peer: &str, mem_mb: usize) {
         }
     };
     if !due {
-        return;
+        return true;
     }
     match post(
         coord,
@@ -356,9 +435,16 @@ fn heartbeat_once(coord: &str, peer: &str, mem_mb: usize) {
             },
         }),
     ) {
-        Ok((st, _)) if (200..300).contains(&st) => {}
-        Ok((st, body)) => eprintln!("heartbeat HTTP {st}: {body}"),
-        Err(e) => eprintln!("heartbeat failed: {e}"),
+        Ok((st, _)) if (200..300).contains(&st) => true,
+        Ok((404, _)) => false,
+        Ok((st, body)) => {
+            slog(&format!("heartbeat HTTP {st}: {body}"));
+            true
+        }
+        Err(e) => {
+            slog(&format!("heartbeat failed: {e}"));
+            true
+        }
     }
 }
 
@@ -366,12 +452,12 @@ fn poll_once(coord: &str, peer: &str, args: &Args) {
     let (st, body) = match get(coord, &format!("/api/v1/virtual-nodes/{peer}/tasks/poll")) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("poll failed: {e}");
+            slog(&format!("poll failed: {e}"));
             return;
         }
     };
     if !(200..300).contains(&st) {
-        eprintln!("poll HTTP {st}");
+        slog(&format!("poll HTTP {st}"));
         return;
     }
     let task_id = serde_json::from_str::<serde_json::Value>(&body)
@@ -385,36 +471,158 @@ fn poll_once(coord: &str, peer: &str, args: &Args) {
                 .as_str()
                 .map(str::to_string)
         });
+    let payload = serde_json::from_str::<serde_json::Value>(&body)
+        .ok()
+        .and_then(|v| v.get("task")?.get("payload").cloned())
+        .unwrap_or(serde_json::Value::Null);
     let (Some(id), Some(kind)) = (task_id, task_type) else {
         return;
     };
-    eprintln!("task {id} ({kind})");
-    let (status, detail) = execute_task(&kind, args);
+    slog(&format!("task {id} ({kind})"));
+    let (status, detail) = execute_task(&kind, &payload, args);
     match post(
         coord,
         &format!("/api/v1/virtual-nodes/{peer}/tasks/{id}/complete"),
         &serde_json::json!({"status": status, "detail": detail}),
     ) {
-        Ok((st, _)) if (200..300).contains(&st) => eprintln!("task {id} {status}"),
-        Ok((st, b)) => eprintln!("complete HTTP {st}: {b}"),
-        Err(e) => eprintln!("complete failed: {e}"),
+        Ok((st, _)) if (200..300).contains(&st) => slog(&format!(
+            "task {id} {status}: {}",
+            detail.chars().take(120).collect::<String>()
+        )),
+        Ok((st, b)) => slog(&format!("complete HTTP {st}: {b}")),
+        Err(e) => slog(&format!("complete failed: {e}")),
     }
+}
+
+/// Tier routing: `fast` = interactive small model, anything else = deep 27B.
+pub fn serve_endpoint(tier: &str) -> (String, String) {
+    if tier.trim().eq_ignore_ascii_case("fast") {
+        let base = std::env::var("LLAMA_SERVE_FAST_URL")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| "http://127.0.0.1:8082".to_string());
+        (base, "lama-1.5".to_string())
+    } else {
+        (serve_url(), "lama-2.8".to_string())
+    }
+}
+
+/// Build the llama_serve chat body for a `llama_chat` payload.
+/// `payload.model`: `"fast"` (default `deep` when absent).
+fn build_chat_body(payload: &serde_json::Value) -> (String, serde_json::Value) {
+    let prompt = payload
+        .get("prompt")
+        .and_then(|p| p.as_str())
+        .unwrap_or("Hello")
+        .to_string();
+    let max_tokens = payload
+        .get("max_tokens")
+        .and_then(|n| n.as_u64())
+        .map(|n| n.clamp(1, 512))
+        .unwrap_or(64);
+    let tier = payload
+        .get("model")
+        .and_then(|m| m.as_str())
+        .unwrap_or("deep");
+    let (base, model) = serve_endpoint(tier);
+    let body = serde_json::json!({
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": 0,
+    });
+    (base, body)
+}
+
+/// Pull the assistant text out of a chat-completions body.
+fn extract_answer(body: &str) -> Result<String, String> {
+    serde_json::from_str::<serde_json::Value>(body)
+        .map_err(|e| format!("chat JSON: {e}"))?
+        .get("choices")
+        .and_then(|c| c.get(0))
+        .and_then(|c| c.get("message"))
+        .and_then(|m| m.get("content"))
+        .and_then(|c| c.as_str())
+        .map(str::to_string)
+        .ok_or_else(|| "chat: no choices[0].message.content".to_string())
+}
+
+/// Parse a shard range `"start-end"` (e.g. `"0-16"`). Strict: both numbers,
+/// start < end, end within a sane layer cap.
+pub fn parse_layers(s: &str) -> Result<(u32, u32), String> {
+    let (a, b) = s
+        .trim()
+        .split_once('-')
+        .ok_or_else(|| format!("bad layers (want start-end): {s}"))?;
+    let start: u32 = a
+        .trim()
+        .parse()
+        .map_err(|_| format!("bad layers start: {s}"))?;
+    let end: u32 = b
+        .trim()
+        .parse()
+        .map_err(|_| format!("bad layers end: {s}"))?;
+    if start >= end {
+        return Err(format!("bad layers (start >= end): {s}"));
+    }
+    if end > 4096 {
+        return Err(format!("bad layers (end > 4096): {s}"));
+    }
+    Ok((start, end))
 }
 
 /// Execute task types this agent owns; returns (status, detail).
 /// Unknown types are left for other workers (poolAI convention).
-fn execute_task(kind: &str, args: &Args) -> (String, String) {
+fn execute_task(kind: &str, payload: &serde_json::Value, args: &Args) -> (String, String) {
     match kind {
         "ping" => ("completed".to_string(), "pong from llama_edge".to_string()),
         "llama_shard" => {
-            let ok = rpc_reachable(&args.rpc_endpoint);
+            // v1 contract: {model?, layers: "start-end", rpc_endpoint?}.
+            // Records the assignment even when the tensor worker is down
+            // (reachable flag tells the truth); bad layers fail the task.
+            let model = payload
+                .get("model")
+                .and_then(|m| m.as_str())
+                .unwrap_or("lama-2.8")
+                .to_string();
+            let layers_raw = payload.get("layers").and_then(|l| l.as_str()).unwrap_or("");
+            let (start, end) = match parse_layers(layers_raw) {
+                Ok(v) => v,
+                Err(e) => return ("failed".to_string(), e),
+            };
+            let endpoint = payload
+                .get("rpc_endpoint")
+                .and_then(|e| e.as_str())
+                .unwrap_or(&args.rpc_endpoint)
+                .to_string();
+            let ok = rpc_reachable(&endpoint);
             let detail = serde_json::json!({
-                "rpc_endpoint": args.rpc_endpoint,
+                "model": model,
+                "assigned_layers": format!("{start}-{end}"),
+                "rpc_endpoint": endpoint,
                 "rpc_reachable": ok,
                 "worker": args.worker_id,
             })
             .to_string();
             ("completed".to_string(), detail)
+        }
+        "llama_chat" => {
+            let (base, chat) = build_chat_body(payload);
+            let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
+            match http_json("POST", &url, Some(&chat.to_string()), 600) {
+                Ok((st, body)) if (200..300).contains(&st) => match extract_answer(&body) {
+                    Ok(text) => ("completed".to_string(), text),
+                    Err(e) => ("failed".to_string(), e),
+                },
+                Ok((st, body)) => (
+                    "failed".to_string(),
+                    format!(
+                        "llama_serve HTTP {st}: {}",
+                        body.chars().take(200).collect::<String>()
+                    ),
+                ),
+                Err(e) => ("failed".to_string(), format!("llama_serve: {e}")),
+            }
         }
         _ => (
             "completed".to_string(),
@@ -449,6 +657,7 @@ impl LeaseGuard {
                     "POST",
                     &url,
                     Some(&serde_json::json!({"lease_epoch": epoch}).to_string()),
+                    15,
                 ) {
                     Ok((st, _)) if (200..300).contains(&st) => {}
                     Ok((409, _)) => break,
@@ -512,10 +721,70 @@ mod tests {
     }
 
     #[test]
+    fn parse_layers_shapes() {
+        assert_eq!(parse_layers("0-16").unwrap(), (0, 16));
+        assert_eq!(parse_layers(" 32 - 64 ").unwrap(), (32, 64));
+        assert!(parse_layers("16-16").is_err());
+        assert!(parse_layers("20-10").is_err());
+        assert!(parse_layers("abc").is_err());
+        assert!(parse_layers("0-99999").is_err());
+        assert!(parse_layers("").is_err());
+    }
+
+    #[test]
+    fn shard_arm_contract() {
+        let args = Args::parse_from([
+            "llama_edge",
+            "--worker-id",
+            "t",
+            "--rpc-endpoint",
+            "127.0.0.1:9",
+        ]);
+        // Valid layers, dead endpoint → completed with reachable=false.
+        let (st, detail) = execute_task(
+            "llama_shard",
+            &serde_json::json!({"model": "lama-2.8", "layers": "0-16"}),
+            &args,
+        );
+        assert_eq!(st, "completed");
+        let d: serde_json::Value = serde_json::from_str(&detail).expect("json");
+        assert_eq!(d["assigned_layers"], "0-16");
+        assert_eq!(d["rpc_reachable"], false);
+        // Bad layers → failed (contract violation).
+        let (st, _) = execute_task("llama_shard", &serde_json::json!({"layers": "x"}), &args);
+        assert_eq!(st, "failed");
+        // Unknown types stay untouched for other workers.
+        let (st, _) = execute_task("nope", &serde_json::json!({}), &args);
+        assert_eq!(st, "completed");
+    }
+
+    #[test]
     fn split_url_shapes() {
         assert_eq!(
             split_url("http://127.0.0.1:8091/api/x").unwrap(),
             ("127.0.0.1:8091".to_string(), "/api/x".to_string())
         );
+    }
+
+    #[test]
+    fn chat_body_defaults_and_caps() {
+        let (base, v) = build_chat_body(&serde_json::json!({}));
+        assert_eq!(v["model"], "lama-2.8");
+        assert_eq!(v["max_tokens"], 64);
+        assert!(base.ends_with(":8080"));
+        let (base, v) = build_chat_body(&serde_json::json!({"prompt": "hi", "max_tokens": 99999}));
+        assert_eq!(v["max_tokens"], 512);
+        assert_eq!(v["messages"][0]["content"], "hi");
+        let (base, v) = build_chat_body(&serde_json::json!({"model": "fast"}));
+        assert_eq!(v["model"], "lama-1.5");
+        assert!(base.ends_with(":8082"));
+    }
+
+    #[test]
+    fn extract_answer_shapes() {
+        let ok = r#"{"choices":[{"message":{"content":"hey"}}]}"#;
+        assert_eq!(extract_answer(ok).unwrap(), "hey");
+        assert!(extract_answer(r#"{"choices":[]}"#).is_err());
+        assert!(extract_answer("not json").is_err());
     }
 }

@@ -59,6 +59,29 @@ Worker check: coordinator log must show the worker's free memory at
 registration; `/v1/models` reports `rpc_workers`. Give each worker a
 static LAN IP.
 
+## Shard contract v1 (`llama_shard` tasks, no Termux)
+
+Payload: `{model = "lama-2.8", layers = "start-end", rpc_endpoint?}`.
+Executor (`llama_edge`) validates `layers` strictly (`start < end`,
+numeric, sane cap — garbage fails the task), probes the endpoint, and
+completes with `{model, assigned_layers, rpc_endpoint, rpc_reachable,
+worker}`. Assignment is recorded even when the tensor worker is down
+(`rpc_reachable: false` tells the truth); the layer map reads latest
+`llama_shard` completions per peer. Until a real tensor worker exists,
+shards are bookkeeping — compute stays local.
+
+## MTP draft: coordinator-side speedup, not a worker task (decided 2026-09-14)
+
+MTP speculative decoding is green in-repo (`llama_speed --draft
+models/mtp-Qwen3.8-27B-Q8_0.gguf` exits 0, draft tokens accepted from
+round 2; baseline 27B mmap is 0.031 tok/s, TTF 248 s). MTP tight-couples
+draft + verify per token, so it does NOT distribute: a phone draft would
+need native inference (Termux — cancelled). Role: coordinator-side
+speedup for `:8080` (future `--draft` on `llama_serve` using the local
+draft model), benefiting every consumer incl. the chat loop. A full
+draft-vs-baseline tok/s run needs a quiet box (server stopped) — not
+measured in this session on purpose (server holds the model).
+
 ## Control plane (mirrors poolAI, no invention)
 
 `poolAI/src/bin/poolai-worker.rs`: `register-remote` → `heartbeat-remote`

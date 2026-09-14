@@ -302,9 +302,56 @@ fn respond(stream: &mut std::net::TcpStream, status: u16, reason: &str, ctype: &
     let _ = stream.flush();
 }
 
-struct Server {
+/// One inference job for the worker thread. The reply carries the generated
+/// text or a short error tag (`model not loaded`, `context failed: …`,
+/// `generation failed: …`).
+struct InferenceJob {
+    prompt: String,
+    max_tokens: u32,
+    temperature: f32,
+    reply: std::sync::mpsc::Sender<Result<String, String>>,
+}
+
+/// Single-threaded inference owner: the 27B `Model` (and its contexts) never
+/// leave this thread, so no `Send` bounds are needed and long generations
+/// never block status endpoints (`GET /v1/models` answers from the accept
+/// loop while a chat is generating).
+struct InferenceWorker {
     backend: Backend,
     model: Option<Model>,
+    jobs: std::sync::mpsc::Receiver<InferenceJob>,
+}
+
+impl InferenceWorker {
+    fn run(self) {
+        for job in self.jobs {
+            let out = match &self.model {
+                None => Err("model not loaded".to_string()),
+                Some(model) => {
+                    let mut ctx = match model.new_context(&self.backend, ContextParams::default()) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            let _ = job.reply.send(Err(format!("context failed: {e}")));
+                            continue;
+                        }
+                    };
+                    let opts = GenerateOptions::builder()
+                        .max_tokens(job.max_tokens)
+                        .temperature(job.temperature)
+                        .build();
+                    match llama_rs::generate(model, &mut ctx, &job.prompt, &opts) {
+                        Ok(out) => Ok(out),
+                        Err(e) => Err(format!("generation failed: {e}")),
+                    }
+                }
+            };
+            let _ = job.reply.send(out);
+        }
+    }
+}
+
+struct Server {
+    jobs: std::sync::mpsc::Sender<InferenceJob>,
     model_name: String,
     default_max_tokens: u32,
     default_temperature: f32,
@@ -383,7 +430,7 @@ impl Server {
                     "application/json",
                     &models_body(&self.model_name, &self.rpc_workers),
                 );
-                eprintln!("GET {path} -> 200");
+                slog(&format!("GET {path} -> 200"));
             }
             ("POST", "/v1/chat/completions" | "/chat/completions") => {
                 self.handle_chat(stream, &body);
@@ -400,7 +447,7 @@ impl Server {
                     "application/json",
                     &err_body("not found"),
                 );
-                eprintln!("{method} {path} -> 404");
+                slog(&format!("{method} {path} -> 404"));
             }
         }
     }
@@ -446,20 +493,6 @@ impl Server {
             );
             return;
         }
-        let model = match &self.model {
-            Some(m) => m,
-            None => {
-                respond(
-                    stream,
-                    503,
-                    "Service Unavailable",
-                    "application/json",
-                    &err_body("model not loaded"),
-                );
-                eprintln!("POST chat -> 503 (no model)");
-                return;
-            }
-        };
         let max_tokens = v
             .get("max_tokens")
             .or_else(|| v.get("max_completion_tokens"))
@@ -473,25 +506,29 @@ impl Server {
             .unwrap_or(self.default_temperature);
         let stream_mode = v.get("stream").and_then(|s| s.as_bool()).unwrap_or(false);
 
-        let mut ctx = match model.new_context(&self.backend, ContextParams::default()) {
-            Ok(c) => c,
-            Err(e) => {
-                respond(
-                    stream,
-                    500,
-                    "Internal Server Error",
-                    "application/json",
-                    &err_body(&format!("context failed: {e}")),
-                );
-                return;
-            }
-        };
-        let opts = GenerateOptions::builder()
-            .max_tokens(max_tokens)
-            .temperature(temperature)
-            .build();
-        match llama_rs::generate(model, &mut ctx, &prompt, &opts) {
-            Ok(out) => {
+        // Hand off to the worker thread; status endpoints stay live meanwhile.
+        let (tx, rx) = std::sync::mpsc::channel();
+        if self
+            .jobs
+            .send(InferenceJob {
+                prompt: prompt.clone(),
+                max_tokens,
+                temperature,
+                reply: tx,
+            })
+            .is_err()
+        {
+            respond(
+                stream,
+                500,
+                "Internal Server Error",
+                "application/json",
+                &err_body("inference worker gone"),
+            );
+            return;
+        }
+        match rx.recv() {
+            Ok(Ok(out)) => {
                 let prompt_toks = estimate_tokens(&prompt);
                 if stream_mode {
                     let sse = sse_body(&self.model_name, &out);
@@ -505,20 +542,39 @@ impl Server {
                         &chat_body(&self.model_name, &out, prompt_toks),
                     );
                 }
-                eprintln!(
+                slog(&format!(
                     "POST chat (tokens={max_tokens}) -> 200, {} chars",
                     out.len()
-                );
+                ));
             }
-            Err(e) => {
+            Ok(Err(e)) if e == "model not loaded" => {
+                respond(
+                    stream,
+                    503,
+                    "Service Unavailable",
+                    "application/json",
+                    &err_body("model not loaded"),
+                );
+                slog("POST chat -> 503 (no model)");
+            }
+            Ok(Err(e)) => {
                 respond(
                     stream,
                     500,
                     "Internal Server Error",
                     "application/json",
-                    &err_body(&format!("generation failed: {e}")),
+                    &err_body(&e),
                 );
-                eprintln!("POST chat -> 500 ({e})");
+                slog(&format!("POST chat -> 500 ({e})"));
+            }
+            Err(_) => {
+                respond(
+                    stream,
+                    500,
+                    "Internal Server Error",
+                    "application/json",
+                    &err_body("inference worker gone"),
+                );
             }
         }
     }
@@ -622,18 +678,34 @@ fn main() {
         "llama_serve: OpenAI-compat on http://{addr}/v1 (model {})",
         args.model_name
     ));
-    let server = Server {
-        backend,
-        model,
+    // Inference owns backend+model on its own thread; the accept loop stays
+    // responsive (GET /v1/models answers mid-generation).
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(|| {
+        InferenceWorker {
+            backend,
+            model,
+            jobs: rx,
+        }
+        .run()
+    });
+    let server = std::sync::Arc::new(Server {
+        jobs: tx,
         model_name: args.model_name,
         default_max_tokens: args.max_tokens,
         default_temperature: args.temperature,
         rpc_workers,
-    };
+    });
     for stream in listener.incoming() {
         match stream {
-            Ok(mut s) => server.handle(&mut s),
-            Err(e) => eprintln!("accept failed: {e}"),
+            Ok(s) => {
+                let server = server.clone();
+                std::thread::spawn(move || {
+                    let mut s = s;
+                    server.handle(&mut s);
+                });
+            }
+            Err(e) => slog(&format!("accept failed: {e}")),
         }
     }
 }
@@ -689,6 +761,32 @@ mod tests {
         assert_eq!(v["object"], "chat.completion");
         assert_eq!(v["choices"][0]["message"]["content"], "hello");
         assert_eq!(v["usage"]["prompt_tokens"], 8);
+    }
+
+    #[test]
+    fn worker_without_model_replies_503_tag() {
+        let backend = Backend::init().expect("backend init");
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(|| {
+            InferenceWorker {
+                backend,
+                model: None,
+                jobs: rx,
+            }
+            .run()
+        });
+        let (reply_tx, reply_rx) = std::sync::mpsc::channel();
+        tx.send(InferenceJob {
+            prompt: "hi".to_string(),
+            max_tokens: 8,
+            temperature: 0.0,
+            reply: reply_tx,
+        })
+        .expect("send");
+        assert_eq!(
+            reply_rx.recv().expect("reply"),
+            Err("model not loaded".to_string())
+        );
     }
 
     #[test]

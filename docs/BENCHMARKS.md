@@ -71,6 +71,14 @@ order as the multi-hour criterion run (see `PERFORMANCE_RESEARCH.md`).
 | `pp` | n/a (1-token prompt) | use a real prompt text for prefill numbers |
 | wall | 725.9 s | ≈ **12 min one pass** vs criterion's ~10 h estimate |
 
+### Results (2026-09-14 — interactive tier, `llama_serve` :8082)
+
+Serve: release `llama_serve` + `models/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf`
+(`--model-name lama-1.5`, mmap) beside the 27B on `:8080`. Chat
+`max_tokens=8`: **8 tokens in 3.9 s ≈ 2 tok/s**, TTF seconds — ~65× the
+27B mmap rate (0.031 tok/s, TTF 248 s). This is the fast tier for the
+chat loop; 27B stays the deep tier (see `docs/DISTRIBUTED.md` tiers).
+
 ## Verification
 
 Qwen locally (default):
