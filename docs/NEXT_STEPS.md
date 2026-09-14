@@ -67,6 +67,6 @@ Smaller model / GPU bench removed — we stay 27B mmap with staged RAM control.
     - Optional: `load_staged` → GSV vision push (`GSV_LIVE` env).
 
 3. **Polish (still 100% Rust)**
-    - `ContextParams` presets `low_memory()` / `max_speed()`; chat/tool templates if upstream adds them; embedding norm.
-    - Publish to crates.io if desired; keep `abrakadabra` ticket flow (one commit per drain).
+    - Done: `ContextParams` presets `low_memory()` / `max_speed()`; embedding norm (`l2_norm` / `embed_normalized`); chat templates (`ChatMessage` + `Model::apply_chat_template` / `apply_named_chat_template`, c450159); `examples/` (generate/chat/staged) + `cargo package` clean (47 files, 282 KiB).
+    - Left: tool-call templates if upstream exposes them in the C API; publish to crates.io when ready; keep `abrakadabra` ticket flow (one commit per drain).
 

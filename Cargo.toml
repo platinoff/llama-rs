@@ -10,7 +10,17 @@ repository = "https://github.com/platinoff/llama-rs"
 authors = ["platinoff"]
 keywords = ["llama", "llm", "inference", "gguf", "rust"]
 categories = ["science", "machine-learning"]
-exclude = ["models/*.gguf", "target/*", ".llvm/*", ".cmake/*", "llama.cpp-master/*"]
+exclude = [
+    "models/*",
+    "target/*",
+    ".llvm/*",
+    ".cmake/*",
+    "llama.cpp-master/*",
+    "*.dll",
+    "*.log",
+    "build.pid",
+    ".cargo/*",
+]
 
 [features]
 default = []
