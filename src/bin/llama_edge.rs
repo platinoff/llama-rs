@@ -772,7 +772,7 @@ mod tests {
         assert_eq!(v["model"], "lama-2.8");
         assert_eq!(v["max_tokens"], 64);
         assert!(base.ends_with(":8080"));
-        let (base, v) = build_chat_body(&serde_json::json!({"prompt": "hi", "max_tokens": 99999}));
+        let (_base, v) = build_chat_body(&serde_json::json!({"prompt": "hi", "max_tokens": 99999}));
         assert_eq!(v["max_tokens"], 512);
         assert_eq!(v["messages"][0]["content"], "hi");
         let (base, v) = build_chat_body(&serde_json::json!({"model": "fast"}));

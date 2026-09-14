@@ -28,6 +28,9 @@ pub enum Error {
 
     #[error("mtp error: {0}")]
     Mtp(String),
+
+    #[error("chat template error: {0}")]
+    ChatTemplate(String),
 }
 
 impl From<llama_cpp_2::LlamaCppError> for Error {

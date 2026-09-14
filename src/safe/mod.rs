@@ -3,6 +3,7 @@
 //! All types in this module are safe Rust; FFI is encapsulated in the `llama-cpp-2` dependency.
 
 mod backend;
+mod chat;
 mod context;
 mod embed;
 mod generate;
@@ -13,6 +14,7 @@ mod rpc;
 mod staged;
 
 pub use backend::Backend;
+pub use chat::ChatMessage;
 pub use context::{presets as context_presets, Context, GenerateOptions, GenerateOptionsBuilder};
 #[cfg(feature = "embeddings")]
 pub use embed::{embed, embed_normalized};
