@@ -58,12 +58,19 @@ encoding_rs = "0.8"
 hex = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# Pinned to 0.1.154 on purpose: the local registry copies carry 4 build.rs
-# patches (aarch/discovery, cpp-httplib static link, llama-common-base, import
-# libs) + 1 MTP common/log.cpp edit + vendored ggml/src/ggml-rpc/* sources at
+# Pinned to an exact llama-cpp-2 on purpose: the local registry copies carry
+# 4 build.rs patches (aarch/discovery, cpp-httplib static link,
+# llama-common-base, import libs) + 1 MTP common/log.cpp edit + 1 MTP
+# common/speculative.cpp edit + vendored ggml/src/ggml-rpc/* sources at
 # proto-5.0.0 pin f5b9bd39 (for GGML_RPC=ON builds, see docs/DISTRIBUTED.md).
-# Bumping to 0.1.156 requires re-applying all six + the 27B GGUF E2E
+# Bumping this line requires re-applying all six onto the fresh registry copy
+# (patches/ documents them) + the 27B GGUF E2E incl. MTP draft
 # (docs/HANDOFF_NEW_SESSION.md).
+# 0.1.156 trialed 2026-09-15: lib/bins/clippy/tests + 27B generate + chat
+# round-trip GREEN, but MTP draft E2E aborts on the new upstream
+# src/models/qwen35.cpp GGML_ASSERT(layer.nextn.eh_proj) (the vendored
+# mtp-Qwen3.8-27B-Q8_0.gguf ships no eh_proj) => pinned back to 0.1.154,
+# bump blocked pending draft-model regeneration / owner decision.
 llama-cpp-2 = { version = "=0.1.154", features = ["sampler"] }
 sysinfo = "0.39"
 thiserror = "2.0"
