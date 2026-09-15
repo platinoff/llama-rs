@@ -114,6 +114,23 @@ Verdict: MoE-at-2-bit is the right lane (huge win vs dense 27B), yet the
 or a smaller-than-RAM quant (IQ1_S ≈ 5.8 GiB / Q2_K ~7 GiB class) to stop
 thrashing; no 8-bit MTP draft is required for this path.
 
+### Results (2026-09-15 — Wave A: `UD-IQ1_S` aborts, 1-bit is NOT viable here)
+
+`models/Qwen3-30B-A3B-UD-IQ1_S.gguf` (9 043 300 928 B) loads fine (metadata
+OK) but every generate path dies at the ggml CPU guard:
+
+```
+Assertion failed: !isnan(x), file .../llama-cpp-sys-2-0.1.154/llama.cpp/ggml/src/ggml-cpu/ops.cpp, line 3234
+```
+
+reproduced on **both** 0.1.154 and 0.1.156 (`llama_speed` cold/warm + 4-prompt
+coherence grid via `llama_rs.exe`, temp 0) → not a bump regression, not a file
+corruption (resume-race excluded: same assert from a clean .154 binary):
+IQ1_S + `qwen3moe` emits NaN activations on CPU dequant. 1-bit is out for this
+stack; the resident lane needs IQ2_XS-class (≈8.2 GiB, still > RAM) or more RAM
+/ a second ggml-rpc x86 host (Wave B). Interim posture: deep = IQ2_XXS async
+(0.497), interactive = `:8082` fast tier.
+
 ## Verification
 
 Qwen locally (default):

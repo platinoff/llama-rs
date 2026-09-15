@@ -161,6 +161,7 @@ exposes `MtpSpeculative` in `speculative.rs`.
 | `llama_speed` + RAM free (~2.5 GiB) | Qwen 27B IQ2, mmap | ~0.5–1 (theoretical, untested) |
 | `llama_speed` + `resident` (if fits w/ apps closed) | Qwen 27B IQ2 | ~0.5–1 |
 | `llama_speed` (measured 2026-09-15) | Qwen3-30B-A3B UD-IQ2_XXS, mmap, fast-tier live, deep stopped | **0.497** (32 tg, TTFT 298 s cold, one pass ~6 min — MoE beats dense-27B ~11× but 9.65 GiB file > 7.4 GiB RAM still thrashes → not the 2–6 hoped; needs smaller-than-RAM quant or more RAM) |
+| `llama_speed` + coherence grid (measured 2026-09-15) | Qwen3-30B-A3B **UD-IQ1_S** (8.42 GiB), mmap | ⛔ **abort**: ggml-cpu/ops.cpp:3234 `GGML_ASSERT(!isnan(x))` on BOTH 0.1.154 and 0.1.156 — IQ1_S x qwen3moe emits NaN on CPU; 1-bit lane out for this stack (BENCHMARKS.md Wave A) |
 
 ## References
 
