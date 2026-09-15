@@ -1,0 +1,83 @@
+--- a/build.rs
++++ b/build.rs
+@@ -1078,6 +1078,27 @@
+         println!("cargo:backends_dir={}", out_dir.join("backends").display());
+     }
+ 
++    // llama-common-base carries build-info.cpp (llama_commit / llama_build_number /
++    // llama_compiler / llama_build_target / llama_build_info). rustc does not reliably
++    // embed that second archive into the rlib on GNU/MinGW, so compile the generated TU
++    // directly into the wrapper archive instead.
++    if cfg!(feature = "common") && !build_shared_libs {
++        let bi_cpp = out_dir.join("build").join("common").join("build-info.cpp");
++        if bi_cpp.is_file() {
++            let mut bi = cc::Build::new();
++            bi.cpp(true)
++                .file(&bi_cpp)
++                .include(&llama_src)
++                .include(llama_src.join("common"))
++                .include(llama_src.join("include"))
++                .include(llama_src.join("ggml/include"))
++                .include(llama_src.join("vendor"))
++                .flag_if_supported("-std=c++17")
++                .pic(true)
++                .compile("llama_cpp_sys_2_buildinfo");
++        }
++    }
++
+     // The CMake build installs a ggml package config. Tell the dependent crates where it
+     // is, in the DEP_LLAMA_GGML_CMAKE_DIR variable. A dependent crate that also builds
+     // ggml can put this path in CMAKE_PREFIX_PATH and use this ggml. Then there is only
+@@ -1305,7 +1326,16 @@
+             &target_os,
+         ) {
+             println!("cargo:rustc-link-lib={llama_libs_kind}=llama-common");
+-            if library_file_exists(
++            // llama-common-base carries build-info.cpp (llama_commit, llama_build_number,
++            // llama_compiler, llama_build_target, llama_build_info); the MinGW `.a` archives
++            // are never matched by library_file_exists (it only probes `.lib`), so link it
++            // unconditionally for the static build.
++            if !build_shared_libs {
++                eprintln!(
++                    "llama-cpp-sys-2: emitting static=llama-common-base (shared={build_shared_libs})"
++                );
++                println!("cargo:rustc-link-lib={llama_libs_kind}=llama-common-base");
++            } else if library_file_exists(
+                 &common_search_dirs,
+                 "llama-common-base",
+                 build_shared_libs,
+@@ -1324,6 +1354,19 @@
+         }
+     }
+ 
++    // cpp-httplib is a private static dependency of llama-common (download.cpp, hf-cache.cpp)
++    // that neither llama_libs nor the common archives pull in on static GNU builds.
++    if cfg!(feature = "common") && !build_shared_libs {
++        let httplib_lib_dir = out_dir.join("build").join("vendor").join("cpp-httplib");
++        if httplib_lib_dir.is_dir() {
++            println!(
++                "cargo:rustc-link-search=native={}",
++                httplib_lib_dir.display()
++            );
++            println!("cargo:rustc-link-lib={llama_libs_kind}=cpp-httplib");
++        }
++    }
++
+     if cfg!(feature = "system-ggml") {
+         println!("cargo:rustc-link-lib={llama_libs_kind}=ggml");
+         println!("cargo:rustc-link-lib={llama_libs_kind}=ggml-base");
+@@ -1357,6 +1400,14 @@
+                 }
+             }
+         }
++        TargetOs::Windows(WindowsVariant::Other) => {
++            // MinGW/GNU: upstream 0.1.154 only links advapi32 for MSVC. llama.cpp's
++            // ggml-cpu CPU-feature probe uses the Registry (advapi32), arg.cpp uses
++            // CommandLineToArgvW (shell32), and cpp-httplib needs Winsock (ws2_32).
++            println!("cargo:rustc-link-lib=advapi32");
++            println!("cargo:rustc-link-lib=shell32");
++            println!("cargo:rustc-link-lib=ws2_32");
++        }
+         TargetOs::Linux => {
+             if cfg!(feature = "static-stdcxx") {
+                 emit_compiler_static_archive_search_path("libstdc++.a");

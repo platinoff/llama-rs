@@ -1,0 +1,36 @@
+--- a/llama.cpp/common/speculative.cpp
++++ b/llama.cpp/common/speculative.cpp
+@@ -561,15 +561,6 @@
+         if (N <= 0) {
+             return;
+         }
+-        // expected state after prefill: ctx_dft has pos 0..N-2 (last position is deferred to
+-        // draft()'s seed step). Warn only if more than one position is missing.
+-        auto * ctx_dft = this->params.ctx_dft;
+-        const llama_pos pos_max = llama_memory_seq_pos_max(llama_get_memory(ctx_dft), seq_id);
+-        if (pos_max < N - 2) {
+-            SPC_WRN("ctx_dft pos_max=%d < N-2=%d — process() did not run on every prefill ubatch. "
+-                    "Drafts may degrade.\n",
+-                    (int) pos_max, N - 2);
+-        }
+     }
+ 
+     bool process(const llama_batch & batch_in) override {
+@@ -1386,17 +1377,6 @@
+         if (N <= 0) {
+             return;
+         }
+-
+-        auto * ctx_dft = this->params.ctx_dft;
+-        const llama_pos pos_max = llama_memory_seq_pos_max(llama_get_memory(ctx_dft), seq_id);
+-
+-        if (pos_max < N - 1 && !is_mem_shared) {
+-            SPC_WRN("ctx_dft pos_max=%d < N-1=%d - "
+-                    "process() hook may not have run on every prefill ubatch "
+-                    "(need_embd / logits=1 on every prompt position?). "
+-                    "Drafts may degrade.\n",
+-                    (int) pos_max, N - 1);
+-        }
+     }
+ 
+     bool process(const llama_batch & batch_in) override {
