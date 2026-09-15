@@ -91,6 +91,29 @@ answer back (`max_tokens=8`, same prompt):
 
 Phone needs nothing but Telegram (initData-gated enqueue).
 
+### Results (2026-09-15 — MoE path: `Qwen3-30B-A3B-UD-IQ2_XXS`, `llama_speed` one pass)
+
+Run: `./target/release/llama_speed.exe --model models/Qwen3-30B-A3B-UD-IQ2_XXS.gguf
+--prompt "<1440 chars / 321 tok>" --gen-tokens 32 --n-ctx 512 --mmap --json`
+(deep `:8080` stopped for the pass; fast `:8082` stayed live — service-first,
+not a fully quiet box). File 10 362 262 080 B (≈9.65 GiB) > 7.4 GiB RAM.
+
+```json
+{"pp_tokens":321,"pp_tokens_per_sec":1.075,"tg_tokens":32,"tg_tokens_per_sec":0.497,"ttft_ms":298503,"prompt_ms":298493,"eval_ms":64413,"wall_time_ms":362906,"decode_count":33,"model":"models/Qwen3-30B-A3B-UD-IQ2_XXS.gguf","use_mmap":true,"use_mlock":false}
+```
+
+| Benchmark | Value | Notes |
+|---|---|---|
+| `tg` (decode) | **0.497 tok/s** (32 tok / 64.4 s) | **≈11–16× the dense-27B baseline** (0.031–0.045); MoE active 3.3B helps exactly as predicted, but the 9.65 GiB file still page-thrashes on 7.4 GiB RAM (expert slices re-read per token) |
+| `pp` | **1.075 tok/s** (321 tok / 298.5 s) | cold first-touch: prefill streams most of the 9.65 GiB from disk — disk-bound, not compute |
+| `ttft` | **298.5 s** | same cold page-in; a warm second pass would drop sharply |
+| wall | 362.9 s | one pass ≈ 6 min |
+
+Verdict: MoE-at-2-bit is the right lane (huge win vs dense 27B), yet the
+2–6 tok/s research expectation needs either ~10 GiB RAM (resident experts)
+or a smaller-than-RAM quant (IQ1_S ≈ 5.8 GiB / Q2_K ~7 GiB class) to stop
+thrashing; no 8-bit MTP draft is required for this path.
+
 ## Verification
 
 Qwen locally (default):
