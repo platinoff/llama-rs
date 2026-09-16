@@ -131,6 +131,29 @@ stack; the resident lane needs IQ2_XS-class (≈8.2 GiB, still > RAM) or more RA
 / a second ggml-rpc x86 host (Wave B). Interim posture: deep = IQ2_XXS async
 (0.497), interactive = `:8082` fast tier.
 
+### Results (2026-09-16 — PH-S2991 Vulkan on the iGPU (Vega 7, MSYS2 toolchain))
+
+Toolchain: NO LunarG SDK needed — pacman `vulkan-headers vulkan-loader glslang
+spirv-tools shaderc spirv-headers` + `VULKAN_SDK=C:/msys64/ucrt64` + llama-rs
+feature `vulkan` (= `llama-cpp-2/vulkan`); `llama_speed`/`llama_serve` gained
+`--n-gpu-layers` (default 0 = CPU path unchanged). Device: `AMD Radeon(TM)
+Graphics (AMD proprietary driver) | uma:1 fp16:1` — unified memory ⇒ the
+bandwidth ceiling stays system RAM, gains are compute overlap. Idle box,
+post-reboot (CPU 1.5B here measures far above the earlier under-load serve rate).
+
+| Model | Path | pp tok/s | tg tok/s | TTFT | vs CPU |
+|---|---|---|---|---|---|
+| Qwen2.5-1.5B Q4_K_M | CPU (mmap) | 45.6 | 24.1 | 1 804 ms | baseline |
+| Qwen2.5-1.5B Q4_K_M | Vulkan ngl=99 | **160.4** | 24.9 | **533 ms** | **pp ×3.5, TTFT ×3.4** |
+| Qwen3-30B-A3B IQ2_XXS | CPU ngl=0 (2026-09-15) | 1.08 cold | 0.497 | 298 s | baseline |
+| Qwen3-30B-A3B IQ2_XXS | Vulkan ngl=15 (probe) | 3.48 cold | **0.865** | 23.3 s | **tg ×1.74** |
+
+Takeaways: (1) Vulkan is free prefill/TTFT for the fast tier once a
+`--features vulkan` build is promoted to serve; (2) MoE deep tg 0.5→0.9 with
+only 15 layers offloaded (uma caps upside; ngl>15 ≈ no gain); (3) prod
+binaries remain CPU-only — promotion is an owner decision (`cargo build
+--features vulkan --release` + `llama_serve --n-gpu-layers` in the Run entry).
+
 ## Verification
 
 Qwen locally (default):

@@ -108,6 +108,11 @@ struct Args {
     #[arg(long, default_value_t = false)]
     mlock: bool,
 
+    /// Layers offloaded to GPU backends compiled in (Vulkan with the `vulkan`
+    /// feature) — PH-S2991; 0 keeps the CPU/staged path unchanged (default).
+    #[arg(long, default_value_t = 0)]
+    n_gpu_layers: u32,
+
     /// Append log lines to this file too (for hidden runs with no console).
     #[arg(long)]
     log_file: Option<String>,
@@ -700,16 +705,26 @@ fn main() {
                 slog(&format!("error: model file not found: {}", p.display()));
                 std::process::exit(1);
             }
-            let staged = StagedLoadOptions::new()
-                .with_mmap(!args.no_mmap)
-                .with_mlock(args.mlock);
             slog(&format!(
                 "loading {} (mmap={}, mlock={}) ...",
                 p.display(),
                 !args.no_mmap,
                 args.mlock
             ));
-            match Model::load_staged(&backend, p, staged, None::<fn(f32) -> bool>) {
+            let loaded = if args.n_gpu_layers > 0 {
+                // GPU-offload path (plain load so n_gpu_layers reaches the
+                // device backends); mmap stays on unless --no-mmap.
+                let params = llama_cpp_2::model::params::LlamaModelParams::default()
+                    .with_use_mmap(!args.no_mmap)
+                    .with_n_gpu_layers(args.n_gpu_layers);
+                Model::load_from_file(&backend, p, &params)
+            } else {
+                let staged = StagedLoadOptions::new()
+                    .with_mmap(!args.no_mmap)
+                    .with_mlock(args.mlock);
+                Model::load_staged(&backend, p, staged, None::<fn(f32) -> bool>)
+            };
+            match loaded {
                 Ok(m) => {
                     slog("model loaded");
                     Some(m)

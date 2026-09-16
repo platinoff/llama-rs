@@ -77,6 +77,11 @@ struct Args {
     /// Path to a draft GGUF for MTP speculative decoding (requires --model too).
     #[arg(long)]
     draft: Option<String>,
+
+    /// Layers to offload to GPU backends (Vulkan/CUDA) built into this binary
+    /// (PH-S2991 spike; 0 = CPU path, unchanged default behavior).
+    #[arg(long, default_value_t = 0)]
+    n_gpu_layers: u32,
 }
 
 /// One-line JSON of metrics + load config (GSV live ingest shape).
@@ -142,7 +147,20 @@ fn run(args: Args) -> i32 {
             eprintln!("{w}");
         }
     }
-    let model = if args.progress {
+    let model = if args.n_gpu_layers > 0 {
+        // PH-S2991 spike: plain (non-staged) load so n_gpu_layers reaches
+        // llama.cpp's device offloading (Vulkan when built with the feature).
+        let params = llama_cpp_2::model::params::LlamaModelParams::default()
+            .with_use_mmap(use_mmap)
+            .with_n_gpu_layers(args.n_gpu_layers);
+        match Model::load_from_file(&backend, path, &params) {
+            Ok(m) => m,
+            Err(e) => {
+                eprintln!("error: failed to load model (gpu offload): {}", e);
+                return 1;
+            }
+        }
+    } else if args.progress {
         let mut last_pct = 0u32;
         match Model::load_staged_with_progress(&backend, path, staged, &mut |p: f32| {
             let pct = (p * 100.0) as u32;

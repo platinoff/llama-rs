@@ -29,6 +29,9 @@ metrics = []
 # Distributed inference coordinator: links ggml_backend_rpc_add_server.
 # Requires a GGML_RPC=ON sys build (env-forwarded to CMake, no patch).
 rpc = []
+# PH-S2991 Vulkan spike: builds ggml-vulkan (MSYS2 glslangValidator/spirv-as
+# toolchain, no LunarG SDK); llama_speed --n-gpu-layers exercises offload.
+vulkan = ["llama-cpp-2/vulkan"]
 
 [lib]
 name = "llama_rs"
