@@ -493,18 +493,39 @@ fn poll_once(coord: &str, peer: &str, args: &Args) {
         return;
     };
     slog(&format!("task {id} ({kind})"));
-    let (status, detail) = execute_task(&kind, &payload, args);
+    match execute_task(&kind, &payload, args) {
+        Some((status, detail)) => match post(
+            coord,
+            &format!("/api/v1/virtual-nodes/{peer}/tasks/{id}/complete"),
+            &serde_json::json!({"status": status, "detail": detail}),
+        ) {
+            Ok((st, _)) if (200..300).contains(&st) => slog(&format!(
+                "task {id} {status}: {}",
+                detail.chars().take(120).collect::<String>()
+            )),
+            Ok((st, b)) => slog(&format!("complete HTTP {st}: {b}")),
+            Err(e) => slog(&format!("complete failed: {e}")),
+        },
+        // Not ours (e.g. test_ping for phones): put back for the right
+        // worker instead of completing — completing would eat foreign tasks.
+        None => requeue_task(coord, peer, &id, &kind, &payload),
+    }
+}
+
+/// Requeue a popped task the pool convention reserves for another worker.
+/// Best-effort: a failed requeue only logs (the task stays popped, same as
+/// a failed complete — no silent loss beyond what the queue already does).
+fn requeue_task(coord: &str, peer: &str, id: &str, kind: &str, payload: &serde_json::Value) {
     match post(
         coord,
-        &format!("/api/v1/virtual-nodes/{peer}/tasks/{id}/complete"),
-        &serde_json::json!({"status": status, "detail": detail}),
+        &format!("/api/v1/virtual-nodes/{peer}/tasks"),
+        &serde_json::json!({"task_type": kind, "payload": payload}),
     ) {
-        Ok((st, _)) if (200..300).contains(&st) => slog(&format!(
-            "task {id} {status}: {}",
-            detail.chars().take(120).collect::<String>()
-        )),
-        Ok((st, b)) => slog(&format!("complete HTTP {st}: {b}")),
-        Err(e) => slog(&format!("complete failed: {e}")),
+        Ok((st, _)) if (200..300).contains(&st) => {
+            slog(&format!("task {id} ({kind}) requeued for its worker"))
+        }
+        Ok((st, b)) => slog(&format!("requeue HTTP {st}: {b}")),
+        Err(e) => slog(&format!("requeue failed: {e}")),
     }
 }
 
@@ -586,10 +607,12 @@ pub fn parse_layers(s: &str) -> Result<(u32, u32), String> {
 }
 
 /// Execute task types this agent owns; returns (status, detail).
-/// Unknown types are left for other workers (poolAI convention).
-fn execute_task(kind: &str, payload: &serde_json::Value, args: &Args) -> (String, String) {
+/// Unknown types return `None` — left for other workers (poolAI convention):
+/// the caller requeues them instead of completing (completing would eat
+/// foreign tasks, e.g. phone `test_ping`).
+fn execute_task(kind: &str, payload: &serde_json::Value, args: &Args) -> Option<(String, String)> {
     match kind {
-        "ping" => ("completed".to_string(), "pong from llama_edge".to_string()),
+        "ping" => Some(("completed".to_string(), "pong from llama_edge".to_string())),
         "llama_shard" => {
             // v1 contract: {model?, layers: "start-end", rpc_endpoint?}.
             // Records the assignment even when the tensor worker is down
@@ -602,7 +625,7 @@ fn execute_task(kind: &str, payload: &serde_json::Value, args: &Args) -> (String
             let layers_raw = payload.get("layers").and_then(|l| l.as_str()).unwrap_or("");
             let (start, end) = match parse_layers(layers_raw) {
                 Ok(v) => v,
-                Err(e) => return ("failed".to_string(), e),
+                Err(e) => return Some(("failed".to_string(), e)),
             };
             let endpoint = payload
                 .get("rpc_endpoint")
@@ -618,9 +641,9 @@ fn execute_task(kind: &str, payload: &serde_json::Value, args: &Args) -> (String
                 "worker": args.worker_id,
             })
             .to_string();
-            ("completed".to_string(), detail)
+            Some(("completed".to_string(), detail))
         }
-        "llama_chat" => {
+        "llama_chat" => Some({
             let (base, chat) = build_chat_body(payload);
             let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
             match http_json("POST", &url, Some(&chat.to_string()), 600) {
@@ -637,11 +660,8 @@ fn execute_task(kind: &str, payload: &serde_json::Value, args: &Args) -> (String
                 ),
                 Err(e) => ("failed".to_string(), format!("llama_serve: {e}")),
             }
-        }
-        _ => (
-            "completed".to_string(),
-            format!("llama_edge: task type {kind} ignored"),
-        ),
+        }),
+        _ => None,
     }
 }
 
@@ -759,17 +779,23 @@ mod tests {
             "llama_shard",
             &serde_json::json!({"model": "lama-2.8", "layers": "0-16"}),
             &args,
-        );
+        )
+        .expect("known type executes");
         assert_eq!(st, "completed");
         let d: serde_json::Value = serde_json::from_str(&detail).expect("json");
         assert_eq!(d["assigned_layers"], "0-16");
         assert_eq!(d["rpc_reachable"], false);
         // Bad layers → failed (contract violation).
-        let (st, _) = execute_task("llama_shard", &serde_json::json!({"layers": "x"}), &args);
+        let (st, _) = execute_task("llama_shard", &serde_json::json!({"layers": "x"}), &args)
+            .expect("known type executes");
         assert_eq!(st, "failed");
-        // Unknown types stay untouched for other workers.
-        let (st, _) = execute_task("nope", &serde_json::json!({}), &args);
-        assert_eq!(st, "completed");
+        // Unknown types return None so the caller requeues them for the
+        // right worker instead of eating them with a fake complete.
+        assert_eq!(execute_task("nope", &serde_json::json!({}), &args), None);
+        assert_eq!(
+            execute_task("test_ping", &serde_json::json!({}), &args),
+            None
+        );
     }
 
     #[test]
