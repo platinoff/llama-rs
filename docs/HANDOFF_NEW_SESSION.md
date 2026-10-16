@@ -28,3 +28,18 @@ kit-canon entry point (`gsv_products_scan` / GSV `rules-check` registry gate).
   c450159) + crates.io prep (examples + `cargo package` clean, 57f558b). Board:
   bump `llama-cpp-2 -> 0.1.156` left **open** (re-apply 6 registry patches + full
   rebuild + serve downtime); swarm band stays blocked on Pi 4 / A54 hardware.
+- **State (2026-10-16)**: owner decision moved the worker/APK role from Telenetis
+  into the engines (`GSV_AGI_PATH.md` §worker/APK, commit `ae83e24`; `PRODUCTS.md`
+  row `llama-rs` = provider id **`bunke-rock`**). `llama_edge` is now **hub-edge
+  first**: `--hub-edge http://<lan>:9999/api/edge` routes register/join/poll through
+  the GSV single-entry reverse proxy (fronts poolAI `/api/v1`), carrying
+  `x-gsv-edge-token` from `GSV_EDGE_TOKEN` (`--edge-token-env`); the legacy direct
+  `--coordinator …:8091` path is kept. Edge token is **never logged** (`Endpoint`
+  masks it). `cargo xtask build-matrix [--build]` adds the exe/bin/apk matrix
+  (win-gnu/msvc, linux x86_64/aarch64, android arm64) with SHA-256 for the
+  already-built `llama_rs`/`llama_serve`/`llama_edge` artifacts; `--build` gates
+  `cargo build --release --target` by `rustup target list --installed`, skipping
+  absent cross linkers honestly. Gate: fmt + clippy `-D` 0 + `--lib --bin *`
+  tests green (11 edge + 3 xtask); `--test integration` blocked only because the
+  live debug `llama_edge`/`llama_serve` hold `target/debug/*.exe` (integration is
+  lib-only, untouched). One local commit, **no push** (B11).

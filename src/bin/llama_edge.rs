@@ -9,7 +9,20 @@
 //! for telegram_edge); phones bind via Telegram, tensors stay on
 //! ggml-rpc-server (see `docs/DISTRIBUTED.md`).
 //!
+//! **Hub-edge first (2026-10-16 owner decision).** Off-box clients must not
+//! dial poolAI `:8091` directly; they go through the GSV hub single-entry
+//! reverse proxy at `/api/edge` (which fronts poolAI `/api/v1`), carrying the
+//! `x-gsv-edge-token` header. Pass `--hub-edge http://<lan>:9999/api/edge`
+//! (token from `GSV_EDGE_TOKEN` by default) and the same register/join/poll
+//! flow routes via the hub. Omit it to keep the legacy direct-coordinator
+//! path (`--coordinator …:8091`). The edge token is never logged.
+//!
 //! ```text
+//! # hub-edge (canon): one entry point, token in the header
+//! cargo run --bin llama_edge -- --hub-edge http://<lan>:9999/api/edge \
+//!   --worker-id edge-test-01 --rpc-endpoint 192.168.1.10:50052
+//!
+//! # legacy direct coordinator
 //! cargo run --bin llama_edge -- --coordinator http://<this-pc-lan-ip>:8091 \
 //!   --worker-id edge-test-01 --rpc-endpoint 192.168.1.10:50052 \
 //!   --telegram-id 999001
@@ -57,13 +70,27 @@ fn slog(msg: &str) {
 
 #[derive(Parser, Debug)]
 #[command(name = "llama_edge")]
-#[command(about = "llama shard edge worker for the poolAI coordinator")]
+#[command(
+    about = "llama shard edge worker for the poolAI coordinator (direct or via the GSV hub edge)"
+)]
 struct Args {
     /// Coordinator base URL (poolAI serves :8091 here; :8080 is llama_serve).
     /// Band 233: defaults to this machine's local address, not `127.0.0.1` —
     /// same-box VMs reach the host; remote edges pass an explicit URL.
+    /// Ignored when `--hub-edge` is set.
     #[arg(long, default_value_os_t = default_coordinator())]
     coordinator: String,
+
+    /// Route through the GSV hub single-entry edge instead of a direct
+    /// coordinator, e.g. `http://<lan>:9999/api/edge`. Off-box clients must
+    /// never hit poolAI :8091 directly; the hub fronts poolAI `/api/v1`.
+    #[arg(long)]
+    hub_edge: Option<String>,
+
+    /// Env var holding the GSV edge token sent as `x-gsv-edge-token` in
+    /// `--hub-edge` mode (never logged).
+    #[arg(long, default_value = "GSV_EDGE_TOKEN")]
+    edge_token_env: String,
 
     /// Worker peer id (must match poolAI worker-id rules).
     #[arg(long, default_value = "llama-edge-01")]
@@ -100,6 +127,74 @@ struct Args {
     /// Append log lines to this file too (for hidden runs with no console).
     #[arg(long)]
     log_file: Option<String>,
+}
+
+/// One control-plane target: a base URL, the path prefix poolAI expects
+/// (`/api/v1` direct, empty via the hub edge which re-adds it), and the
+/// optional `x-gsv-edge-token` header for hub mode.
+#[derive(Clone, Debug)]
+struct Endpoint {
+    base: String,
+    prefix: &'static str,
+    token: Option<String>,
+}
+
+impl Endpoint {
+    /// Legacy direct-coordinator endpoint (`:8091`, `/api/v1`, no token).
+    fn direct(coordinator: &str) -> Self {
+        Self {
+            base: coordinator.to_string(),
+            prefix: "/api/v1",
+            token: None,
+        }
+    }
+
+    /// Hub single-entry edge endpoint (`/api/edge`, no extra prefix, token).
+    fn hub(hub_edge: &str, token: Option<String>) -> Self {
+        Self {
+            base: hub_edge.to_string(),
+            prefix: "",
+            token,
+        }
+    }
+
+    /// Full URL for a poolAI-relative path (`"/discovery/register-remote"`).
+    fn url(&self, path: &str) -> String {
+        format!("{}{}{}", self.base.trim_end_matches('/'), self.prefix, path)
+    }
+
+    /// Human label with the edge token masked (never the raw token).
+    fn describe(&self) -> String {
+        match &self.token {
+            Some(t) => format!("{} (edge token {})", self.base, mask_token(t)),
+            None => self.base.clone(),
+        }
+    }
+}
+
+/// Mask a secret for logs: `…` + last 4 chars, or `<unset>`.
+fn mask_token(secret: &str) -> String {
+    let s = secret.trim();
+    if s.is_empty() {
+        return "<unset>".to_string();
+    }
+    let tail: String = s
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("…{tail}")
+}
+
+/// Read a token from an env var (trimmed; empty → `None`).
+fn token_from_env(var: &str) -> Option<String> {
+    std::env::var(var)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
 }
 
 fn signing_key_bytes(args: &Args) -> Result<[u8; 32], String> {
@@ -165,10 +260,12 @@ fn default_rpc_endpoint() -> String {
 
 /// Minimal blocking HTTP: returns (status_code, body). Follows the same
 /// shape as `llama_serve`'s parser (single response, Connection: close).
+/// `token` (hub-edge mode) is sent as `x-gsv-edge-token`.
 /// `timeout_secs` covers connect + full read (chat needs minutes).
 fn http_json(
     method: &str,
     url: &str,
+    token: Option<&str>,
     body: Option<&str>,
     timeout_secs: u64,
 ) -> Result<(u16, String), String> {
@@ -179,9 +276,13 @@ fn http_json(
     stream
         .set_read_timeout(Some(timeout))
         .map_err(|e| e.to_string())?;
+    let mut token_line = String::new();
+    if let Some(t) = token.filter(|t| !t.trim().is_empty()) {
+        token_line = format!("\r\nx-gsv-edge-token: {}", t.trim());
+    }
     let len = body.map(str::len).unwrap_or(0);
     let req = format!(
-        "{method} {path} HTTP/1.1\r\nHost: {host_port}\r\nContent-Type: application/json\r\nContent-Length: {len}\r\nConnection: close\r\n\r\n{}",
+        "{method} {path} HTTP/1.1\r\nHost: {host_port}\r\nContent-Type: application/json{token_line}\r\nContent-Length: {len}\r\nConnection: close\r\n\r\n{}",
         body.unwrap_or("")
     );
     stream
@@ -285,14 +386,18 @@ fn capability_doc(
     }))
 }
 
-fn post(coordinator: &str, path: &str, body: &serde_json::Value) -> Result<(u16, String), String> {
-    let url = format!("{}{path}", coordinator.trim_end_matches('/'));
-    http_json("POST", &url, Some(&body.to_string()), 15)
+fn post(ep: &Endpoint, path: &str, body: &serde_json::Value) -> Result<(u16, String), String> {
+    http_json(
+        "POST",
+        &ep.url(path),
+        ep.token.as_deref(),
+        Some(&body.to_string()),
+        15,
+    )
 }
 
-fn get(coordinator: &str, path: &str) -> Result<(u16, String), String> {
-    let url = format!("{}{path}", coordinator.trim_end_matches('/'));
-    http_json("GET", &url, None, 15)
+fn get(ep: &Endpoint, path: &str) -> Result<(u16, String), String> {
+    http_json("GET", &ep.url(path), ep.token.as_deref(), None, 15)
 }
 
 fn check(status: u16, body: &str, what: &str) -> Result<(), String> {
@@ -323,29 +428,36 @@ fn run(args: Args) -> Result<(), String> {
         total_ram_mb()
     };
     let caps = vec!["inference:cpu".to_string(), "llama_shard".to_string()];
-    let coord = args.coordinator.clone();
     let peer = args.worker_id.clone();
 
+    // Hub-edge (canon) when `--hub-edge` is set, else the legacy direct
+    // coordinator. The hub fronts poolAI `/api/v1` and expects the token.
+    let target = match &args.hub_edge {
+        Some(h) => Endpoint::hub(h, token_from_env(&args.edge_token_env)),
+        None => Endpoint::direct(&args.coordinator),
+    };
+
     slog(&format!(
-        "llama_edge {peer} -> {coord} (rpc {})",
+        "llama_edge {peer} -> {} (rpc {})",
+        target.describe(),
         args.rpc_endpoint
     ));
 
     // 1–3. register + bind + join (idempotent, re-runs on 404).
-    join_once(&args, &key, &caps, mem_mb, &coord, &peer)?;
+    join_once(&args, &key, &caps, mem_mb, &target, &peer)?;
 
     // 4. heartbeat + poll loop. A 404 means the coordinator forgot us
     // (restart wipes in-memory registrations) — re-join instead of
     // haunting the loop as a ghost.
     loop {
-        if !heartbeat_once(&coord, &peer, mem_mb) {
+        if !heartbeat_once(&target, &peer, mem_mb) {
             slog("heartbeat lost registration; re-joining");
-            if join_once(&args, &key, &caps, mem_mb, &coord, &peer).is_err() {
+            if join_once(&args, &key, &caps, mem_mb, &target, &peer).is_err() {
                 std::thread::sleep(Duration::from_secs(30));
                 continue;
             }
         }
-        poll_once(&coord, &peer, &args);
+        poll_once(&target, &peer, &args);
         std::thread::sleep(Duration::from_secs(args.poll_secs.max(1)));
     }
 }
@@ -357,14 +469,14 @@ fn join_once(
     key: &[u8; 32],
     caps: &[String],
     mem_mb: usize,
-    coord: &str,
+    ep: &Endpoint,
     peer: &str,
 ) -> Result<(), String> {
     // 1. register-remote (telegram_edge + virtual_node role + signed doc).
     let doc = capability_doc(key, peer, caps)?;
     let (st, body) = post(
-        coord,
-        "/api/v1/discovery/register-remote",
+        ep,
+        "/discovery/register-remote",
         &serde_json::json!({
             "peer_id": peer,
             "address": llama_rs::net::local_addr(),
@@ -391,8 +503,8 @@ fn join_once(
     // 2. optional Telegram bind.
     if let Some(tg) = &args.telegram_id {
         let (st, body) = post(
-            coord,
-            "/api/v1/virtual-nodes/telegram/bind",
+            ep,
+            "/virtual-nodes/telegram/bind",
             &serde_json::json!({"telegram_user_id": tg, "peer_id": peer}),
         )?;
         check(st, &body, "telegram bind")?;
@@ -401,8 +513,8 @@ fn join_once(
 
     // 3. pool/join.
     let (st, body) = post(
-        coord,
-        &format!("/api/v1/virtual-nodes/{peer}/pool/join"),
+        ep,
+        &format!("/virtual-nodes/{peer}/pool/join"),
         &serde_json::json!({"max_memory_mb": mem_mb, "max_concurrent_requests": 4}),
     )?;
     check(st, &body, "pool join").or_else(|e| {
@@ -417,7 +529,7 @@ fn join_once(
 }
 
 /// Returns false when the coordinator forgot us (404) so the caller re-joins.
-fn heartbeat_once(coord: &str, peer: &str, mem_mb: usize) -> bool {
+fn heartbeat_once(ep: &Endpoint, peer: &str, mem_mb: usize) -> bool {
     static mut LAST: u64 = 0;
     let now = now_secs();
     // Heartbeat every ~15s regardless of poll cadence.
@@ -433,8 +545,8 @@ fn heartbeat_once(coord: &str, peer: &str, mem_mb: usize) -> bool {
         return true;
     }
     match post(
-        coord,
-        "/api/v1/discovery/heartbeat-remote",
+        ep,
+        "/discovery/heartbeat-remote",
         &serde_json::json!({
             "peer_id": peer,
             "capabilities": {
@@ -462,8 +574,8 @@ fn heartbeat_once(coord: &str, peer: &str, mem_mb: usize) -> bool {
     }
 }
 
-fn poll_once(coord: &str, peer: &str, args: &Args) {
-    let (st, body) = match get(coord, &format!("/api/v1/virtual-nodes/{peer}/tasks/poll")) {
+fn poll_once(ep: &Endpoint, peer: &str, args: &Args) {
+    let (st, body) = match get(ep, &format!("/virtual-nodes/{peer}/tasks/poll")) {
         Ok(v) => v,
         Err(e) => {
             slog(&format!("poll failed: {e}"));
@@ -495,8 +607,8 @@ fn poll_once(coord: &str, peer: &str, args: &Args) {
     slog(&format!("task {id} ({kind})"));
     match execute_task(&kind, &payload, args) {
         Some((status, detail)) => match post(
-            coord,
-            &format!("/api/v1/virtual-nodes/{peer}/tasks/{id}/complete"),
+            ep,
+            &format!("/virtual-nodes/{peer}/tasks/{id}/complete"),
             &serde_json::json!({"status": status, "detail": detail}),
         ) {
             Ok((st, _)) if (200..300).contains(&st) => slog(&format!(
@@ -508,17 +620,17 @@ fn poll_once(coord: &str, peer: &str, args: &Args) {
         },
         // Not ours (e.g. test_ping for phones): put back for the right
         // worker instead of completing — completing would eat foreign tasks.
-        None => requeue_task(coord, peer, &id, &kind, &payload),
+        None => requeue_task(ep, peer, &id, &kind, &payload),
     }
 }
 
 /// Requeue a popped task the pool convention reserves for another worker.
 /// Best-effort: a failed requeue only logs (the task stays popped, same as
 /// a failed complete — no silent loss beyond what the queue already does).
-fn requeue_task(coord: &str, peer: &str, id: &str, kind: &str, payload: &serde_json::Value) {
+fn requeue_task(ep: &Endpoint, peer: &str, id: &str, kind: &str, payload: &serde_json::Value) {
     match post(
-        coord,
-        &format!("/api/v1/virtual-nodes/{peer}/tasks"),
+        ep,
+        &format!("/virtual-nodes/{peer}/tasks"),
         &serde_json::json!({"task_type": kind, "payload": payload}),
     ) {
         Ok((st, _)) if (200..300).contains(&st) => {
@@ -646,7 +758,7 @@ fn execute_task(kind: &str, payload: &serde_json::Value, args: &Args) -> Option<
         "llama_chat" => Some({
             let (base, chat) = build_chat_body(payload);
             let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
-            match http_json("POST", &url, Some(&chat.to_string()), 600) {
+            match http_json("POST", &url, None, Some(&chat.to_string()), 600) {
                 Ok((st, body)) if (200..300).contains(&st) => match extract_answer(&body) {
                     Ok(text) => ("completed".to_string(), text),
                     Err(e) => ("failed".to_string(), e),
@@ -690,6 +802,7 @@ impl LeaseGuard {
                 match http_json(
                     "POST",
                     &url,
+                    None,
                     Some(&serde_json::json!({"lease_epoch": epoch}).to_string()),
                     15,
                 ) {
@@ -804,6 +917,69 @@ mod tests {
             split_url("http://127.0.0.1:8091/api/x").unwrap(),
             ("127.0.0.1:8091".to_string(), "/api/x".to_string())
         );
+    }
+
+    #[test]
+    fn endpoint_routes_direct_and_hub_edge() {
+        // Legacy direct: poolAI :8091 keeps the /api/v1 prefix.
+        let direct = Endpoint::direct("http://192.168.2.238:8091");
+        assert_eq!(
+            direct.url("/discovery/register-remote"),
+            "http://192.168.2.238:8091/api/v1/discovery/register-remote"
+        );
+        assert_eq!(
+            direct.url("/virtual-nodes/p1/tasks/poll"),
+            "http://192.168.2.238:8091/api/v1/virtual-nodes/p1/tasks/poll"
+        );
+        assert!(direct.token.is_none());
+        assert_eq!(direct.describe(), "http://192.168.2.238:8091");
+
+        // Hub single-entry: /api/edge base carries no extra prefix, and the
+        // hub re-adds /api/v1 when it fronts poolAI.
+        let hub = Endpoint::hub(
+            "http://192.168.2.238:9999/api/edge",
+            Some("tok-abcd1234".into()),
+        );
+        assert_eq!(
+            hub.url("/discovery/register-remote"),
+            "http://192.168.2.238:9999/api/edge/discovery/register-remote"
+        );
+        assert_eq!(
+            hub.url("/virtual-nodes/p1/pool/join"),
+            "http://192.168.2.238:9999/api/edge/virtual-nodes/p1/pool/join"
+        );
+        assert_eq!(hub.token.as_deref(), Some("tok-abcd1234"));
+    }
+
+    #[test]
+    fn mask_token_hides_secret() {
+        assert_eq!(mask_token(""), "<unset>");
+        assert_eq!(mask_token("tok-abcd1234"), "…1234");
+        let hub = Endpoint::hub(
+            "http://192.168.2.238:9999/api/edge",
+            Some("super-secret-edge-token".into()),
+        );
+        assert!(!hub.describe().contains("super-secret"));
+        assert!(hub.describe().contains("…oken"));
+    }
+
+    #[test]
+    fn hub_edge_args_parse() {
+        let args = Args::parse_from([
+            "llama_edge",
+            "--hub-edge",
+            "http://192.168.2.238:9999/api/edge",
+            "--worker-id",
+            "edge-hub-01",
+        ]);
+        assert_eq!(
+            args.hub_edge.as_deref(),
+            Some("http://192.168.2.238:9999/api/edge")
+        );
+        assert_eq!(args.edge_token_env, "GSV_EDGE_TOKEN");
+        // No --hub-edge → legacy direct path.
+        let legacy = Args::parse_from(["llama_edge", "--worker-id", "edge-01"]);
+        assert!(legacy.hub_edge.is_none());
     }
 
     #[test]

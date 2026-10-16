@@ -57,6 +57,15 @@ Smaller model / GPU bench removed — we stay 27B mmap with staged RAM control.
 
 ## What to do next (100% Rust, ultra-fast, GSV-live)
 
+0. **Worker/edge role (canon 2026-10-16)** — the worker/APK role moved from Telenetis
+   into the engines (provider id `bunke-rock`). `llama_edge` routes through the **GSV
+   hub single-entry** `/api/edge` (`--hub-edge http://<lan>:9999/api/edge`, token
+   `GSV_EDGE_TOKEN` → `x-gsv-edge-token`; never `:8091` off-box), keeping the legacy
+   direct `--coordinator` path. Build the exe/bin/apk set with
+   `cargo xtask build-matrix` (add `--build` to attempt cross builds; missing
+   NDK/MSVC/cross-linkers are skipped with a reason). Persist the worker hidden with
+   `cargo xtask edge-install [WORKER_ID] [HUB_EDGE_URL]`.
+
 1. **Maintenance**
     - Bump `llama-cpp-2`/`llama-cpp-sys-2` (now 0.1.154); keep 4 Windows-GNU `build.rs` patches in registry.
     - Keep CI green (Windows GNU, `LIBCLANG_PATH` + `CMAKE` pin, `stable-x86_64-pc-windows-gnu`), `cargo fmt/clippy/test` + `gsv-loc-audit --stretch-96`.
