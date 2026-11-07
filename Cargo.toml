@@ -74,7 +74,7 @@ serde_json = "1"
 # src/models/qwen35.cpp GGML_ASSERT(layer.nextn.eh_proj) (the vendored
 # mtp-Qwen3.8-27B-Q8_0.gguf ships no eh_proj) => pinned back to 0.1.154,
 # bump blocked pending draft-model regeneration / owner decision.
-llama-cpp-2 = { version = "=0.1.156", features = ["sampler"] }
+llama-cpp-2 = { version = "=0.1.154", features = ["sampler"] }
 sysinfo = "0.39"
 thiserror = "2.0"
 

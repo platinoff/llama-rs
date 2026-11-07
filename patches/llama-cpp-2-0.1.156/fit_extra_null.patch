@@ -1,0 +1,14 @@
+--- a/src/model/params.rs
++++ b/src/model/params.rs
+@@ -401,7 +401,12 @@
+                 self.buft_overrides.as_mut_ptr(),
+                 margins.as_mut_ptr(),
+                 n_ctx_min,
++                // sys 0.1.161 added common_fit_extra_model (extra model fitted
++                // alongside the main one; 0.1.156 wrapper knows no draft-fit API).
++                // nullptr is explicitly supported by common_fit_params: the extra
++                // model is skipped and only the main model is fitted (upstream way).
++                std::ptr::null::<std::os::raw::c_void>(),
+                 log_level,
+             )
+         };
