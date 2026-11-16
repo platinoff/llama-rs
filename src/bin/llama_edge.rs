@@ -31,41 +31,31 @@
 use clap::Parser;
 use std::io::{Read, Write as _};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
-/// File log for hidden runs (same pattern as `llama_serve`).
-static LOG_FILE: OnceLock<Mutex<std::fs::File>> = OnceLock::new();
-
-fn init_log(path: Option<&str>) {
-    if let Some(p) = path {
-        match std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(p)
-        {
-            Ok(f) => {
-                let _ = LOG_FILE.set(Mutex::new(f));
-            }
-            Err(e) => eprintln!("warning: cannot open log file {p}: {e}"),
-        }
-    }
+/// Same pattern: every `slog` line goes to stderr AND the rolling file sink
+/// (default `target/live/logs/llama_edge.log`); explicit `--log-file` wins.
+fn slog(msg: &str) {
+    let line = format!("[{}] {msg}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0));
+    eprintln!("{line}");
+    llama_rs::log::log_line(EXPLICIT_LOG.get().and_then(|m| m.as_ref().map(|s| s.as_str())), "llama_edge", msg);
 }
 
-fn slog(msg: &str) {
-    let line = format!(
-        "[{}] {msg}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0)
-    );
-    eprintln!("{line}");
-    if let Some(m) = LOG_FILE.get() {
-        if let Ok(mut f) = m.lock() {
-            let _ = writeln!(f, "{line}");
+static EXPLICIT_LOG: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
+fn init_log(path: Option<&str>) {
+    let p = path.map(|s| s.to_string());
+    if let Some(p) = &p {
+        if let Err(e) = std::fs::OpenOptions::new().create(true).append(true).open(p) {
+            eprintln!("warning: cannot open log file {p}: {e}");
         }
     }
+    let _ = EXPLICIT_LOG.set(p);
+    slog(&format!("log sink ready (explicit {path:?})"));
 }
 
 #[derive(Parser, Debug)]

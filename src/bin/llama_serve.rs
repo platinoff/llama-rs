@@ -29,45 +29,34 @@ use llama_rs::{Backend, ContextParams, GenerateOptions, Model, StagedLoadOptions
 use std::io::{Read, Write as _};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 static REQ_ID: AtomicU64 = AtomicU64::new(1);
 
-/// File log for hidden runs (no console window): every `slog` line goes to
-/// stderr AND, when `--log-file` is set, appended to that file.
-static LOG_FILE: OnceLock<Mutex<std::fs::File>> = OnceLock::new();
-
-fn init_log(path: Option<&str>) {
-    if let Some(p) = path {
-        match std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(p)
-        {
-            Ok(f) => {
-                let _ = LOG_FILE.set(Mutex::new(f));
-                slog(&format!("log file: {p}"));
-            }
-            Err(e) => eprintln!("warning: cannot open log file {p}: {e}"),
-        }
-    }
+/// Every `slog` line goes to stderr AND the rolling file sink (default
+/// `target/live/logs/<name>.log`, 4 MiB rotation, keep 7). `--log-file <path>`
+/// switches to plain append mode on the given file instead.
+fn slog(msg: &str) {
+    let line = format!("[{}] {msg}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0));
+    eprintln!("{line}");
+    llama_rs::log::log_line(EXPLICIT_LOG.get().and_then(|m| m.as_ref().map(|s| s.as_str())), "llama_serve", msg);
 }
 
-fn slog(msg: &str) {
-    let line = format!(
-        "[{}] {msg}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0)
-    );
-    eprintln!("{line}");
-    if let Some(m) = LOG_FILE.get() {
-        if let Ok(mut f) = m.lock() {
-            let _ = writeln!(f, "{line}");
+static EXPLICIT_LOG: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
+fn init_log(path: Option<&str>) {
+    let p = path.map(|s| s.to_string());
+    if let Some(p) = &p {
+        if let Err(e) = std::fs::OpenOptions::new().create(true).append(true).open(p) {
+            eprintln!("warning: cannot open log file {p}: {e}");
         }
     }
+    let _ = EXPLICIT_LOG.set(p);
+    slog(&format!("log sink ready (explicit {path:?})"));
 }
 
 #[derive(Parser, Debug)]

@@ -14,6 +14,7 @@
 
 mod error;
 mod metrics;
+pub mod log;
 pub mod net;
 mod safe;
 
