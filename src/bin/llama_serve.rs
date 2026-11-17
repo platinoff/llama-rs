@@ -29,7 +29,6 @@ use llama_rs::{Backend, ContextParams, GenerateOptions, Model, StagedLoadOptions
 use std::io::{Read, Write as _};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::OnceLock;
 use std::time::Duration;
 
 static REQ_ID: AtomicU64 = AtomicU64::new(1);

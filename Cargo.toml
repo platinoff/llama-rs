@@ -75,6 +75,12 @@ serde_json = "1"
 # mtp-Qwen3.8-27B-Q8_0.gguf ships no eh_proj) => pinned back to 0.1.154,
 # bump blocked pending draft-model regeneration / owner decision.
 llama-cpp-2 = { version = "=0.1.154", features = ["sampler"] }
+# Exact-pin the sys crate too: Cargo.lock is gitignored here, so a broad
+# `cargo update` silently drifted sys-2 to 0.1.161 — the 0.1.154 wrapper does
+# not compile against it (penalties gained n_vocab; fit_extra_null; …).
+# This pair is the verified-green combo; keep them in lockstep on any bump
+# (0.1.156/0.1.161 path is documented in patches/).
+llama-cpp-sys-2 = { version = "=0.1.154" }
 sysinfo = "0.39"
 thiserror = "2.0"
 

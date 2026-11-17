@@ -31,7 +31,7 @@
 use clap::Parser;
 use std::io::{Read, Write as _};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Same pattern: every `slog` line goes to stderr AND the rolling file sink
