@@ -11,7 +11,15 @@ use std::net::{SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
 use std::time::Duration;
 
 /// Whether the running exe is a rustc test-harness artifact (`deps/`).
+///
+/// `cfg!(test)` is authoritative for the unit-test build and immune to EDR
+/// renaming/quarantining the test executable's path (which otherwise
+/// breaks `current_exe()`-based detection and picks the LAN address under
+/// LAN-first). The path check remains as a fallback for stray usages.
 pub fn is_cargo_test_harness() -> bool {
+    if cfg!(test) {
+        return true;
+    }
     std::env::current_exe()
         .ok()
         .map(|p| p.to_string_lossy().replace('\\', "/").contains("/deps/"))
