@@ -37,12 +37,21 @@ static REQ_ID: AtomicU64 = AtomicU64::new(1);
 /// `target/live/logs/<name>.log`, 4 MiB rotation, keep 7). `--log-file <path>`
 /// switches to plain append mode on the given file instead.
 fn slog(msg: &str) {
-    let line = format!("[{}] {msg}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0));
+    let line = format!(
+        "[{}] {msg}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    );
     eprintln!("{line}");
-    llama_rs::log::log_line(EXPLICIT_LOG.get().and_then(|m| m.as_ref().map(|s| s.as_str())), "llama_serve", msg);
+    llama_rs::log::log_line(
+        EXPLICIT_LOG
+            .get()
+            .and_then(|m| m.as_ref().map(|s| s.as_str())),
+        "llama_serve",
+        msg,
+    );
 }
 
 static EXPLICIT_LOG: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
@@ -50,7 +59,11 @@ static EXPLICIT_LOG: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::
 fn init_log(path: Option<&str>) {
     let p = path.map(|s| s.to_string());
     if let Some(p) = &p {
-        if let Err(e) = std::fs::OpenOptions::new().create(true).append(true).open(p) {
+        if let Err(e) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(p)
+        {
             eprintln!("warning: cannot open log file {p}: {e}");
         }
     }

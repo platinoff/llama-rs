@@ -48,7 +48,11 @@ pub fn rolling_open(name: &str) -> Option<std::fs::File> {
             roll(&dir, &active, name);
         }
     }
-    OpenOptions::new().create(true).append(true).open(&active).ok()
+    OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&active)
+        .ok()
 }
 
 fn epoch() -> u64 {

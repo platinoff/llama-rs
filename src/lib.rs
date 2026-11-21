@@ -13,8 +13,8 @@
 //! - [ModelParams], [ContextParams] — defaults for model/context config
 
 mod error;
-mod metrics;
 pub mod log;
+mod metrics;
 pub mod net;
 mod safe;
 
